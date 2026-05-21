@@ -1,0 +1,11 @@
+.venv
+__pycache__/
+*.pyc
+
+# Ignore generated user files
+Tool/userWorkFiles/data/*
+Tool/userWorkFiles/pipelines/*
+
+# Keep folder structure
+!Tool/userWorkFiles/data/__init__.py
+!Tool/userWorkFiles/pipelines/__init__.py
