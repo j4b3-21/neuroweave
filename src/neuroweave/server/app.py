@@ -4,7 +4,9 @@ Security model: a single-user, local tool. The server binds to loopback, rejects
 whose Host header is not local (DNS-rebinding protection) and requires the
 ``X-NeuroWeave-Client`` header on state-changing requests. Browsers cannot attach custom
 headers cross-origin without a CORS preflight, which this server never approves, so other
-websites cannot trigger runs. There is no authentication: anyone with local access to the
+websites cannot trigger runs. API requests that a browser labels as coming from another site
+(``Sec-Fetch-Site``) are refused as well, because even a GET such as loading the node
+catalogue imports project code. There is no authentication: anyone with local access to the
 port can execute the project's node code.
 """
 
@@ -33,6 +35,10 @@ from neuroweave.store.workspace import WorkflowNotFoundError, Workspace
 STATIC_DIR = Path(__file__).parent / "static"
 CLIENT_HEADER = "x-neuroweave-client"
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
+# Sec-Fetch-Site values a browser sends for the Studio's own requests and for requests the user
+# initiates directly (address bar, bookmarks). Clients that send no such header (curl, the CLI,
+# older browsers) are not affected.
+SAME_ORIGIN_FETCH_SITES = {"same-origin", "none"}
 PREVIEW_LIMIT = 2_000_000
 
 
@@ -136,6 +142,11 @@ def create_app(project_root: Path, *, allowed_hosts_extra: list[str] | tuple[str
     async def local_only(request: Request, call_next):
         if _hostname(request.headers.get("host", "")) not in allowed_hosts:
             return JSONResponse({"detail": "Host not allowed."}, status_code=403)
+        fetch_site = request.headers.get("sec-fetch-site")
+        if (request.url.path.startswith("/api/") and fetch_site is not None
+                and fetch_site not in SAME_ORIGIN_FETCH_SITES):
+            return JSONResponse({"detail": "Cross-site API requests are not allowed."},
+                                status_code=403)
         if (request.method not in ("GET", "HEAD", "OPTIONS")
                 and request.url.path.startswith("/api/")
                 and request.headers.get(CLIENT_HEADER) is None):

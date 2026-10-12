@@ -42,3 +42,24 @@ def test_project_files_named_like_stdlib_modules_are_not_imported(tmp_path) -> N
         run = client.post("/api/workflows/empty/runs", json={}, headers=HEADERS).json()
         assert wait_for(client, run["id"])["status"] == "SUCCEEDED"
     assert not marker.exists()
+
+
+def test_cross_site_browser_requests_cannot_reach_the_api(tmp_path) -> None:
+    project = tmp_path / "project"
+    Workspace.init(project, node_modules=["planted"])
+    marker = tmp_path / "imported"
+    marker_module(project / "planted.py", marker)
+
+    with TestClient(create_app(project, allowed_hosts_extra=["testserver"])) as client:
+        for site in ("cross-site", "same-site"):
+            response = client.get("/api/nodes", headers={"Sec-Fetch-Site": site})
+            assert response.status_code == 403, site
+            assert client.post("/api/workflows", json={"id": "x", "name": "x"},
+                               headers={**HEADERS, "Sec-Fetch-Site": site}).status_code == 403
+        assert not marker.exists()
+
+        assert client.get("/api/health", headers={"Sec-Fetch-Site": "same-origin"}).status_code \
+            == 200
+        assert client.get("/api/health", headers={"Sec-Fetch-Site": "none"}).status_code == 200
+        assert client.get("/api/health").status_code == 200
+        assert client.get("/", headers={"Sec-Fetch-Site": "cross-site"}).status_code != 403
