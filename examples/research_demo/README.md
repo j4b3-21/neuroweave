@@ -4,6 +4,10 @@ A small, fully deterministic analysis that exercises every part of NeuroWeave: t
 validation, execution, caching, metrics, stochastic nodes with seeds, figures, reports,
 comparison, reproduction and lineage.
 
+This example is also the sample used by `nw tutor`. Prefer `nw tutor` if you want a guided
+path; use the steps below to explore the same project by hand. The packaged copy under
+`neuroweave.tutorial.assets` must stay byte-identical to this folder (enforced by tests).
+
 **Question.** In a field trial of 24 plots, how strongly does seasonal rainfall predict crop
 yield, and how uncertain is the slope?
 

@@ -171,6 +171,17 @@ Vitest / Playwright tests passed.
 | `3933080` | feat(server): support isolated reproduction from the API | `server/` | `test_api.py` | pass |
 | `ece2d53` | feat(studio): show the environment match and offer reproduction in a rebuilt environment | Studio | Vitest 12, Playwright 12 | pass |
 | `cf4d061` | test(runtime): add opt-in network e2e for isolated reproduction | network e2e | `NEUROWEAVE_NETWORK_TESTS=1` once locally: reproduced + identical | pass |
+| `eb0222d` | docs: document environment locks, isolated reproduction and their limits | docs | — | — |
+
+## Session: onboarding tutorial and Studio tour
+
+| Commit | Message | Scope | Tests | Result |
+|---|---|---|---|---|
+| `96ff195` | feat(tutorial): bundle the sample project used by the tutorial | `tutorial/assets`, `ProjectConfig.tutorial` | drift test | pass |
+| `1df2956` | feat(cli): add nw tutor, a guided terminal walkthrough | `tutorial/walkthrough.py` | `test_tutor.py` | pass |
+| `bed3fa4` | feat(cli): offer the tutorial once on first interactive use | `onboarding.py` | `test_onboarding.py` | pass |
+| `4bcce34` | feat(studio): add a guided tour with data-tour anchors | `apps/studio/src/tour/` | Vitest 16 | pass |
+| `d7aefc8` | test(studio): cover the guided tour and welcome dialog | Playwright `tour.spec.ts` | Playwright 18 | pass |
 
 ## Next highest-priority tasks
 

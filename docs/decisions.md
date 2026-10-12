@@ -182,3 +182,18 @@ builds are refused by default. No Docker for now.
 **Consequences.** Same OS and architecture required; system libraries are not rebuilt; the
 verdict stays exact-content-hash and `environment_match` reports lock equality beside it.
 See [reproducibility.md](reproducibility.md#environment-reconstruction).
+
+## D19. Guided onboarding via `nw tutor` and a Studio tour
+
+**Context.** New users need a path that exercises real CLI commands and the Studio without
+copying example folders by hand.
+**Decision.** Ship the research demo as package data (`neuroweave.tutorial.assets`), expose
+`nw tutor` to materialize it, run real `nw` subprocesses chapter by chapter, then open
+`nw studio` with `#tour`. Offer the tutorial once on first interactive CLI use
+(`~/.config/neuroweave/onboarding.json`; silent under CI / non-TTY /
+`NEUROWEAVE_NO_ONBOARDING`). The Studio tour is dependency-free (spotlight + popover over
+`data-tour` anchors), with a first-visit welcome dialog and Help → Take the tour.
+**Alternatives.** External docs-only onboarding; a third-party tour library; embedding a
+video.
+**Consequences.** Tutorial assets must stay in lockstep with `examples/research_demo`
+(drift test). The Studio tour skips demo-specific steps on non-tutorial projects.
