@@ -25,10 +25,18 @@ export function pythonExecutable(): string {
   return existsSync(venv) ? venv : "python3";
 }
 
+/** Environment for NeuroWeave processes of a test project; trust decisions stay in its temp dir. */
+function nwEnv(root: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    PYTHONDONTWRITEBYTECODE: "1",
+    NEUROWEAVE_TRUST_FILE: path.join(path.dirname(root), "trusted-projects.json"),
+  };
+}
+
 function nw(root: string, ...args: string[]): string {
   return execFileSync(pythonExecutable(), ["-m", "neuroweave.cli", "--project", root, ...args], {
-    cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+    cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], env: nwEnv(root),
   });
 }
 
@@ -56,6 +64,11 @@ export class Project {
     for (const file of FIXTURE_WORKFLOWS) {
       nw(this.root, "workflows", "import", path.join(FIXTURES_DIR, file));
     }
+  }
+
+  /** `nw trust` / `nw trust --revoke`: a project created by `nw init` starts out trusted. */
+  setTrusted(trusted: boolean): void {
+    nw(this.root, "trust", ...(trusted ? [] : ["--revoke"]));
   }
 
   get workspaceDir(): string {
@@ -124,7 +137,7 @@ export class StudioServer {
     const child = spawn(pythonExecutable(), [
       "-m", "neuroweave.cli", "--project", this.project.root, "studio", "--no-open",
       "--port", String(this.port),
-    ], { cwd: this.project.root, env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
+    ], { cwd: this.project.root, env: nwEnv(this.project.root) });
     this.process = child;
     child.stdout?.on("data", (chunk) => { this.output += chunk; });
     child.stderr?.on("data", (chunk) => { this.output += chunk; });

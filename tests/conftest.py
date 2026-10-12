@@ -8,10 +8,19 @@ import pytest
 
 from neuroweave.kernel.serialization import load_workflow
 from neuroweave.sdk.registry import NodeRegistry, default_registry, load_node_modules
+from neuroweave.store.trust import TRUST_FILE_ENV
 from neuroweave.store.workspace import Workspace
 
 ROOT = Path(__file__).resolve().parents[1]
 DEMO_DIR = ROOT / "examples" / "research_demo"
+
+
+@pytest.fixture(autouse=True)
+def trust_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Keep project trust decisions out of the developer's real configuration."""
+    path = tmp_path / "trusted-projects.json"
+    monkeypatch.setenv(TRUST_FILE_ENV, str(path))
+    return path
 
 
 @pytest.fixture

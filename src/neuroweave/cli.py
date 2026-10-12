@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,12 @@ from pydantic import ValidationError
 
 from neuroweave.kernel.serialization import dump_workflow, load_workflow
 from neuroweave.kernel.validation import validate_workflow
+from neuroweave.store.trust import (
+    UntrustedProjectError,
+    needs_trust,
+    revoke_project,
+    trust_project,
+)
 from neuroweave.store.workspace import (
     WorkflowNotFoundError,
     Workspace,
@@ -39,9 +46,31 @@ def _workspace() -> Workspace:
         raise  # unreachable
 
 
+def _interactive() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _confirm_trust(workspace: Workspace) -> bool:
+    """Ask once before importing code from a project that has not been trusted yet."""
+    if not needs_trust(workspace.root, workspace.config.node_modules):
+        return True
+    if _interactive():
+        typer.echo(f"This project has not been trusted on this machine: {workspace.root}\n"
+                   "Opening it imports its node modules ("
+                   + ", ".join(workspace.config.node_modules)
+                   + "), which run with your user permissions.")
+        if typer.confirm("Do you trust this project's code?", default=False):
+            trust_project(workspace.root)
+            typer.echo("Trusted. You will not be asked again for this directory.")
+            return True
+    return False
+
+
 def _load_registry(workspace: Workspace):
     from neuroweave.sdk.registry import default_registry, load_node_modules
 
+    if not _confirm_trust(workspace):
+        _fail(str(UntrustedProjectError(workspace.root)))
     errors = load_node_modules(workspace.config.node_modules, workspace.root)
     for error in errors:
         typer.echo(f"Warning: could not import node module {error.module}: {error.error}",
@@ -102,6 +131,26 @@ def init(
     result = initialize_workspace(base, name=name, node_modules=node_module)
     for line in result.summary_lines():
         typer.echo(line)
+    workspace = Workspace(base)
+    if needs_trust(workspace.root, workspace.config.node_modules):
+        typer.echo("This project already existed and is not trusted yet; its node modules will "
+                   "not be imported until you run `nw trust`.")
+
+
+@app.command()
+def trust(
+    revoke: bool = typer.Option(False, "--revoke", help="Stop trusting this project."),
+) -> None:
+    """Allow this project's node modules to be imported (they run with your permissions)."""
+    workspace = _workspace()
+    if revoke:
+        removed = revoke_project(workspace.root)
+        typer.echo(f"{'No longer trusting' if removed else 'Was not trusting'} {workspace.root}")
+        return
+    trust_project(workspace.root)
+    typer.echo(f"Trusted {workspace.root}. Its node modules ("
+               + (", ".join(workspace.config.node_modules) or "none configured")
+               + ") will be imported when you open, validate or run its workflows.")
 
 
 @app.command()
@@ -463,6 +512,10 @@ def studio(
         typer.echo("Studio UI is not built; the API is available but the web UI is not. "
                    "Build it with `npm --prefix apps/studio install && npm --prefix apps/studio "
                    "run build`.", err=True)
+    if not _confirm_trust(workspace):
+        typer.echo("Opening without importing node code: workflows and run history can be "
+                   "browsed, but the node catalogue is empty and runs are refused until you "
+                   "run `nw trust`.", err=True)
     url = f"http://{host}:{port}"
     typer.echo(f"NeuroWeave Studio for {workspace.root} at {url}")
     typer.echo("Node code runs with your user permissions (no sandbox). Press Ctrl+C to stop.")

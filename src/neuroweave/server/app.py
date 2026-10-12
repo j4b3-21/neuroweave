@@ -6,8 +6,9 @@ whose Host header is not local (DNS-rebinding protection) and requires the
 headers cross-origin without a CORS preflight, which this server never approves, so other
 websites cannot trigger runs. API requests that a browser labels as coming from another site
 (``Sec-Fetch-Site``) are refused as well, because even a GET such as loading the node
-catalogue imports project code. There is no authentication: anyone with local access to the
-port can execute the project's node code.
+catalogue imports project code. Code from a project the user has not trusted
+(``neuroweave.store.trust``) is never imported. There is no authentication: anyone with local
+access to the port can execute a trusted project's node code.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ from neuroweave.provenance import Lineage, downstream_lineage, upstream_lineage
 from neuroweave.server.services import Catalog, CatalogService, RunManager, tail
 from neuroweave.store.artifacts import TEXT_MEDIA_TYPES, ArtifactIntegrityError
 from neuroweave.store.db import ArtifactRecord, MetricRecord, NodeExecutionRecord, RunRecord
+from neuroweave.store.trust import UntrustedProjectError, require_trusted
 from neuroweave.store.workspace import WorkflowNotFoundError, Workspace
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -275,6 +277,7 @@ def create_app(project_root: Path, *, allowed_hosts_extra: list[str] | tuple[str
     @app.post("/api/workflows/{workflow_id}/runs", response_model=RunRecord, status_code=202)
     def start_run(workflow_id: str, request: RunRequest) -> RunRecord:
         workflow = load_workflow_or_404(workflow_id)
+        require_trusted(workspace.root, workspace.config.node_modules)
         report = validate(workflow)
         if not report.valid:
             raise HTTPException(status_code=422, detail={
@@ -432,6 +435,10 @@ def create_app(project_root: Path, *, allowed_hosts_extra: list[str] | tuple[str
     @app.exception_handler(ValidationError)
     async def pydantic_error(_: Request, exc: ValidationError) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": exc.errors(include_url=False)})
+
+    @app.exception_handler(UntrustedProjectError)
+    async def untrusted_project(_: Request, exc: UntrustedProjectError) -> JSONResponse:
+        return JSONResponse(status_code=403, content={"detail": str(exc)})
 
     if (STATIC_DIR / "index.html").exists():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="studio")

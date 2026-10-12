@@ -33,6 +33,7 @@ from neuroweave.store.files import (
     atomic_write_text,
     utc_now,
 )
+from neuroweave.store.trust import trust_project
 
 WORKSPACE_DIRECTORY = ".neuroweave"
 PROJECT_FILE = "project.json"
@@ -98,7 +99,11 @@ class InitializationResult:
 def initialize_workspace(
     base_path: Path, *, name: str | None = None, node_modules: list[str] | None = None
 ) -> InitializationResult:
-    """Create the workspace layout. Idempotent: existing files and directories are preserved."""
+    """Create the workspace layout. Idempotent: existing files and directories are preserved.
+
+    Creating ``project.json`` also trusts the project (see :mod:`neuroweave.store.trust`): the
+    user is setting it up here. An existing ``project.json`` may have come from elsewhere, so
+    it is never trusted implicitly."""
     project_root = base_path.resolve()
     workspace_path = project_root / WORKSPACE_DIRECTORY
     created_directories: list[Path] = []
@@ -128,6 +133,7 @@ def initialize_workspace(
         )
         atomic_write_text(project_file, pretty_json(config.model_dump(mode="json")))
         created_files.append(project_file)
+        trust_project(project_root)
 
     return InitializationResult(
         workspace_path=workspace_path,

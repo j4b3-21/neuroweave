@@ -40,7 +40,9 @@ export function NodesView() {
             <div className="border-b border-rule bg-fail/5 px-4 py-2">
               {catalog.data.errors.map((e) => (
                 <details key={e.module} className="text-[12px] text-fail">
-                  <summary className="cursor-pointer">Module '{e.module}' failed: {e.error}</summary>
+                  <summary className="cursor-pointer">
+                    {e.module === "*" ? e.error : `Module '${e.module}' failed: ${e.error}`}
+                  </summary>
                   <pre className="mt-1 overflow-x-auto font-mono text-[11px] whitespace-pre-wrap">{e.traceback}</pre>
                 </details>
               ))}
