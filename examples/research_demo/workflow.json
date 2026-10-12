@@ -1,0 +1,140 @@
+{
+  "description": "Load a field-trial CSV, clean it, quantify the rainfall/yield relationship, plot it and write a report.",
+  "edges": [
+    {
+      "source": "load",
+      "source_port": "output",
+      "target": "validate",
+      "target_port": "data"
+    },
+    {
+      "source": "validate",
+      "source_port": "output",
+      "target": "transform",
+      "target_port": "data"
+    },
+    {
+      "source": "transform",
+      "source_port": "output",
+      "target": "statistics",
+      "target_port": "data"
+    },
+    {
+      "source": "transform",
+      "source_port": "output",
+      "target": "bootstrap",
+      "target_port": "data"
+    },
+    {
+      "source": "transform",
+      "source_port": "output",
+      "target": "plot",
+      "target_port": "data"
+    },
+    {
+      "source": "statistics",
+      "source_port": "output",
+      "target": "plot",
+      "target_port": "stats"
+    },
+    {
+      "source": "statistics",
+      "source_port": "output",
+      "target": "report",
+      "target_port": "stats"
+    },
+    {
+      "source": "bootstrap",
+      "source_port": "output",
+      "target": "report",
+      "target_port": "interval"
+    },
+    {
+      "source": "plot",
+      "source_port": "output",
+      "target": "report",
+      "target_port": "figure"
+    }
+  ],
+  "id": "rainfall-yield",
+  "name": "Rainfall and crop yield",
+  "nodes": [
+    {
+      "id": "load",
+      "label": null,
+      "params": {
+        "path": "data/field_trial.csv"
+      },
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "type": "demo_nodes:load_dataset"
+    },
+    {
+      "id": "validate",
+      "label": null,
+      "params": {},
+      "position": {
+        "x": 300.0,
+        "y": 0.0
+      },
+      "type": "demo_nodes:validate_dataset"
+    },
+    {
+      "id": "transform",
+      "label": null,
+      "params": {
+        "rainfall_unit": "cm"
+      },
+      "position": {
+        "x": 600.0,
+        "y": 0.0
+      },
+      "type": "demo_nodes:transform_dataset"
+    },
+    {
+      "id": "statistics",
+      "label": null,
+      "params": {},
+      "position": {
+        "x": 900.0,
+        "y": 0.0
+      },
+      "type": "demo_nodes:compute_statistics"
+    },
+    {
+      "id": "bootstrap",
+      "label": null,
+      "params": {
+        "resamples": 500
+      },
+      "position": {
+        "x": 900.0,
+        "y": 150.0
+      },
+      "type": "demo_nodes:bootstrap_slope"
+    },
+    {
+      "id": "plot",
+      "label": null,
+      "params": {},
+      "position": {
+        "x": 1200.0,
+        "y": 0.0
+      },
+      "type": "demo_nodes:plot_relationship"
+    },
+    {
+      "id": "report",
+      "label": null,
+      "params": {},
+      "position": {
+        "x": 1500.0,
+        "y": 0.0
+      },
+      "type": "demo_nodes:write_report"
+    }
+  ],
+  "schema_version": 1
+}
