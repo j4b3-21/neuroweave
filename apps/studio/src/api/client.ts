@@ -92,7 +92,8 @@ export const api = {
   logs: (runId: string, nodeId: string) =>
     request<string>("GET", `/api/runs/${enc(runId)}/logs/${enc(nodeId)}`),
   cancelRun: (id: string) => request<RunRecord>("POST", `/api/runs/${enc(id)}/cancel`),
-  reproduce: (id: string) => request<RunRecord>("POST", `/api/runs/${enc(id)}/reproduce`),
+  reproduce: (id: string, body: { isolated?: boolean; rebuild?: boolean; allow_build?: boolean } = {}) =>
+    request<RunRecord>("POST", `/api/runs/${enc(id)}/reproduce`, body),
   reproduction: (id: string) => request<ReproductionReport>("GET", `/api/runs/${enc(id)}/reproduction`),
   compare: (a: string, b: string) => request<RunComparison>("GET", `/api/compare${q({ a, b })}`),
 
