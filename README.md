@@ -143,9 +143,19 @@ pytest                                  # Python tests (uses temporary directori
 npm --prefix apps/studio run typecheck
 npm --prefix apps/studio test           # Vitest unit tests
 npm --prefix apps/studio run build      # writes src/neuroweave/server/static
+npm --prefix apps/studio exec -- playwright install chromium   # once
+npm --prefix apps/studio run test:e2e   # build, then browser tests against real `nw studio` servers
 ```
 
-CI runs the same steps on Python 3.11 and 3.14 (`.github/workflows/ci.yml`).
+The browser tests (`apps/studio/e2e/`) create a fresh temporary project and start their own
+`nw studio` on a free port for every test, so they never touch your projects. They use the
+repository's `.venv` interpreter, or `NEUROWEAVE_PYTHON` if set, and block any request that
+leaves the machine. On failure, traces and screenshots are written to
+`apps/studio/test-results/` (open one with
+`npm --prefix apps/studio exec -- playwright show-trace PATH`).
+
+CI runs the Python steps on Python 3.11 and 3.14, the Studio checks, and the browser tests
+(`.github/workflows/ci.yml`).
 
 Repository layout:
 
