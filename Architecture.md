@@ -2,6 +2,12 @@
 
 ## A Graph-Native Platform for Reproducible Computational Research
 
+> **Status note (v0.2.0).** This document is the original architectural proposal and is kept
+> unchanged as the statement of direction. The system actually built in this repository, and
+> how each proposed component maps onto it, is described in
+> [docs/architecture.md](docs/architecture.md); decisions that refine or defer parts of this
+> proposal are in [docs/decisions.md](docs/decisions.md).
+
 ---
 
 # Mission

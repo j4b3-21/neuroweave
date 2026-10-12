@@ -8,7 +8,7 @@ criteria are met and its tests pass. Live status is tracked in
 - [x] Audit (`docs/architecture-audit.md`), plan (this file), decisions (`docs/decisions.md`)
 - [x] Baseline tests recorded (3/3 unittest pass)
 
-## M1 — Core graph and SDK  (depends on M0)
+## M1 — Core graph and SDK  (depends on M0) — **done**
 Deliverables: `neuroweave` package; `@node` decorator; scoped `NodeRegistry`; type
 system (`TypeSpec` parsing from annotations, compatibility rules, UI widget hints);
 `Workflow`/`NodeInstance`/`Edge` models; validation (unknown node types, unknown ports,
@@ -18,7 +18,7 @@ Acceptance: workflows round-trip byte-identically; invalid graphs return structu
 actionable errors; plan order is stable across runs.
 Tests: `test_sdk.py`, `test_types.py`, `test_graph.py`.
 
-## M2 — Local execution runtime  (depends on M1)
+## M2 — Local execution runtime  (depends on M1) — **done**
 Deliverables: executor with state machine (PENDING→RUNNING→SUCCEEDED|FAILED|SKIPPED|CANCELLED);
 input resolution from upstream outputs, params and defaults; runtime type checks;
 per-node log capture; timings; failure propagation (downstream SKIPPED, run FAILED);
@@ -26,37 +26,37 @@ cooperative cancellation; deterministic per-node seeds; `log_metric` context API
 Acceptance: failed dependency never yields downstream success; logs and errors persisted.
 Tests: `test_runtime.py`.
 
-## M3 — Artifacts and provenance  (depends on M2)
+## M3 — Artifacts and provenance  (depends on M2) — **done**
 Deliverables: content-addressed blob store with atomic writes and verification;
 serializers (json, table, text, bytes, pickle-with-hash-check); external file inputs hashed
 and recorded; SQLite schema for runs, node executions, artifacts, inputs, metrics;
 upstream/downstream lineage queries labelled observed vs inferred.
 Acceptance: every output has an artifact record with hash; tampering is detected;
 lineage of the final report reaches the input CSV.
-Tests: `test_artifacts.py`, `test_provenance.py`.
+Tests: `test_artifacts.py`, `test_provenance_experiments.py`.
 
-## M4 — Persistence and reconstruction  (depends on M3)
+## M4 — Persistence and reconstruction  (depends on M3) — **done**
 Deliverables: workspace API (open/init, workflow CRUD with atomic writes), immutable
 content-addressed snapshots per run, historical run inspection, legacy `graph.json` import.
 Acceptance: a new process reopens the workspace and reconstructs workflow, runs, artifacts.
 Tests: `test_workspace.py`, restart test in `test_end_to_end.py`.
 
-## M5 — Experiments and reproducibility  (depends on M4)
+## M5 — Experiments and reproducibility  (depends on M4) — **done**
 Deliverables: environment record (Python, platform, packages, Git commit/dirty);
 run comparison (snapshot diff, params, inputs, code hashes, statuses, metrics, outputs,
 environment); cache with explicit hit records and `--no-cache`; `reproduce` check with
 explicit policy (exact content hash).
 Acceptance: changing one parameter reruns only the affected subgraph; comparison lists the
 parameter change; reproduce on the deterministic example reports all outputs identical.
-Tests: `test_cache.py`, `test_experiments.py`.
+Tests: `test_cache.py`, `test_provenance_experiments.py`.
 
-## M6 — CLI  (depends on M5)
+## M6 — CLI  (depends on M5) — **done**
 Commands: `init`, `nodes`, `workflows`, `validate`, `run`, `runs`, `show`, `artifacts`,
 `verify`, `lineage`, `compare`, `reproduce`, `studio`.
 Acceptance: each command works against the example; errors exit non-zero with a message.
 Tests: `test_cli.py`.
 
-## M7 — API and Studio  (depends on M6)
+## M7 — API and Studio  (depends on M6) — **done**
 Deliverables: FastAPI app (project, catalog, workflows CRUD/validate, runs start/cancel/
 status/logs, artifacts content/verify/lineage, compare); catalog and runs computed in child
 processes; localhost protections. Studio: shell (sidebar, workspace, inspector, bottom
@@ -66,11 +66,11 @@ Acceptance: all screens show real project data; edits survive reload; a run star
 Studio produces the same records as the CLI.
 Tests: `test_api.py`; Vitest unit tests for graph mapping; manual browser verification.
 
-## M8 — End-to-end demonstration  (depends on M7)
+## M8 — End-to-end demonstration  (depends on M7) — **done**
 Deliverables: `examples/research_demo` (CSV → validate → transform → statistics →
 SVG chart → Markdown report); integration test covering the 15 acceptance checks.
 
-## M9 — Release readiness
+## M9 — Release readiness — **done**
 README, install/dev setup, capabilities and limitations, security notes, GitHub Actions CI
 (ruff, pytest on 3.11/3.14, Studio typecheck/test/build).
 
