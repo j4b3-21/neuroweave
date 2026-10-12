@@ -44,6 +44,7 @@ function PortRow({ port, side, connected, value }: {
       side === "out" ? "justify-end pr-3 pl-6" : "pl-3 pr-6"}`}>
       <Handle id={port.name} type={side === "in" ? "target" : "source"}
               position={side === "in" ? Position.Left : Position.Right}
+              aria-label={`${side === "in" ? "Input" : "Output"} port ${port.name}`}
               style={{ background: portColor(port) }} />
       <span className={missing ? "text-fail" : "text-ink"} title={typeLabel(port.type)}>
         {port.name}
