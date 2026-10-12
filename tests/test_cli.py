@@ -84,3 +84,30 @@ def test_workflow_import_export(demo_project, tmp_path) -> None:
     result = nw(demo_project, "workflows", "import", str(exported))
     assert result.exit_code == 1 and "--force" in result.output
     assert nw(demo_project, "workflows", "import", str(exported), "--force").exit_code == 0
+
+
+def test_cli_env_show_and_export(demo_project, tmp_path) -> None:
+    result = nw(demo_project, "run", "rainfall-yield")
+    assert result.exit_code == 0, result.output
+    run_id = re.search(r"Run (run_\S+): SUCCEEDED", result.output).group(1)
+
+    result = nw(demo_project, "env", "show", run_id)
+    assert result.exit_code == 0, result.output
+    assert "Lock hash:" in result.output
+    assert "NeuroWeave:" in result.output
+    assert ("typer==" in result.output or "pydantic==" in result.output
+            or "fastapi==" in result.output)
+
+    out = tmp_path / "requirements.lock"
+    result = nw(demo_project, "env", "export", run_id, "-o", str(out))
+    assert result.exit_code == 0, result.output
+    assert out.is_file() and "Wrote" in result.output
+    assert out.read_text(encoding="utf-8")
+
+
+def test_cli_reproduce_rebuild_requires_isolated(demo_project) -> None:
+    result = nw(demo_project, "run", "rainfall-yield")
+    run_id = re.search(r"Run (run_\S+): SUCCEEDED", result.output).group(1)
+    result = nw(demo_project, "reproduce", run_id, "--rebuild")
+    assert result.exit_code == 1
+    assert "--isolated" in result.output
