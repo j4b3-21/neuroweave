@@ -343,7 +343,9 @@ def logs(run_id: str, node_id: str) -> None:
     if not execution.log_path:
         typer.echo("(node did not start; no log)")
         return
-    path = workspace.dir / execution.log_path
+    path = (workspace.dir / execution.log_path).resolve()
+    if workspace.dir.resolve() not in path.parents:
+        _fail(f"Refusing to read log path outside the workspace: {execution.log_path}")
     typer.echo(path.read_text(encoding="utf-8") if path.exists() else "(empty log)", nl=False)
 
 

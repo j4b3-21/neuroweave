@@ -181,6 +181,21 @@ def test_projects_without_node_modules_need_no_trust(tmp_path) -> None:
         assert client.get("/api/nodes").json()["errors"] == []
 
 
+def test_cli_logs_never_reads_outside_the_workspace(tmp_path, demo_project) -> None:
+    result = nw(demo_project.root, "run", "rainfall-yield")
+    assert result.exit_code == 0, result.output
+    run = demo_project.db.list_runs(limit=1)[0]
+    execution = next(e for e in demo_project.db.node_executions(run.id) if e.node_id == "load")
+    assert nw(demo_project.root, "logs", run.id, "load").exit_code == 0
+
+    secret = tmp_path / "secret.txt"
+    secret.write_text("not for the terminal", encoding="utf-8")
+    demo_project.db.update_node_execution(execution.id, log_path="../../secret.txt")
+    result = nw(demo_project.root, "logs", run.id, "load")
+    assert result.exit_code == 1 and "outside the workspace" in result.output
+    assert "not for the terminal" not in result.output
+
+
 def test_unreadable_trust_file_trusts_nothing(tmp_path, trust_file) -> None:
     project = Workspace.init(tmp_path / "mine").root
     trust_file.write_text("{not json", encoding="utf-8")
