@@ -45,6 +45,11 @@ nw runs                        # list recorded runs
 nw studio                      # open the visual Studio at http://127.0.0.1:8765
 ```
 
+`nw init` created this project, so it is trusted. A project that already contains
+`.neuroweave/` (a cloned repository, an archive, a shared folder) is not: NeuroWeave asks
+before importing its node code, and `nw trust` grants it. See
+[docs/security.md](docs/security.md#opening-a-project-trust).
+
 See [examples/research_demo/README.md](examples/research_demo/README.md) for a guided tour
 covering comparison, reproduction and lineage.
 
@@ -96,7 +101,8 @@ from the current directory.
 
 | Command | Purpose |
 |---|---|
-| `nw init [--name N] [-m MODULE]` | Create `.neuroweave/` in the current directory |
+| `nw init [--name N] [-m MODULE]` | Create `.neuroweave/` in the current directory (and trust the new project) |
+| `nw trust [--revoke]` | Allow (or stop allowing) this project's node modules to be imported |
 | `nw nodes [--json]` | List node definitions and module import errors |
 | `nw workflows list / import FILE [--force] / export ID` | Manage workflow files |
 | `nw validate ID` | Check a workflow against the node catalog |
@@ -162,8 +168,11 @@ docs/
 ## Limitations
 
 - **No sandbox.** Node code runs in a child process with your user's permissions, file
-  access and network. The Studio and API bind to `127.0.0.1` and reject other hosts, but any
-  local process can call the API. Only use node modules you trust.
+  access and network. The Studio and API bind to `127.0.0.1` and reject other hosts and
+  cross-site browser requests, but any local process can call the API. NeuroWeave asks before
+  importing code from a project you did not create, but that is a confirmation step, not
+  isolation: only trust node modules (and received `.neuroweave/` stores, which may contain
+  pickles) that you would run as an ordinary Python script.
 - **Reproducibility is evidence, not a guarantee.** NeuroWeave records the environment but
   does not recreate it, and the code hash covers only the node function's own source. See
   [docs/reproducibility.md](docs/reproducibility.md) for what is and is not detected.
