@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -14,6 +16,7 @@ from typer.testing import CliRunner
 
 from neuroweave.cli import app
 from neuroweave.kernel.serialization import load_workflow
+from neuroweave.runtime.environment import git_info
 from neuroweave.server.app import create_app
 from neuroweave.store.trust import is_trusted, revoke_project, trust_project
 from neuroweave.store.workspace import Workspace
@@ -194,6 +197,27 @@ def test_cli_logs_never_reads_outside_the_workspace(tmp_path, demo_project) -> N
     result = nw(demo_project.root, "logs", run.id, "load")
     assert result.exit_code == 1 and "outside the workspace" in result.output
     assert "not for the terminal" not in result.output
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
+def test_recording_git_state_does_not_run_commands_from_the_repository_config(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    marker = tmp_path / "fsmonitor-ran"
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t",
+                        *args], check=True, capture_output=True)
+
+    repo.mkdir()
+    git("init", "-q")
+    (repo / "file.txt").write_text("x", encoding="utf-8")
+    git("add", "file.txt")
+    git("commit", "-q", "-m", "init")
+    git("config", "core.fsmonitor", f"touch {shlex.quote(str(marker))}; false")
+
+    info = git_info(repo)
+    assert info is not None and len(info["commit"]) == 40
+    assert not marker.exists()
 
 
 def test_unreadable_trust_file_trusts_nothing(tmp_path, trust_file) -> None:
