@@ -25,6 +25,11 @@ from neuroweave.store.files import utc_now
 from neuroweave.store.workspace import Workspace
 
 CANCEL_GRACE_SECONDS = 10.0
+# `python -m` runs with the project directory as cwd and would put it first on sys.path, so a
+# project file named like a standard-library module (argparse.py, json.py) would be imported
+# before any NeuroWeave code runs. -P (Python 3.11+) leaves it off; node modules are still
+# imported from the project root, which load_node_modules adds explicitly.
+SAFE_PATH = ("-P",)
 
 
 class Catalog(BaseModel):
@@ -71,7 +76,7 @@ class CatalogService:
     def _discover(self) -> Catalog:
         try:
             completed = subprocess.run(
-                [sys.executable, "-m", "neuroweave.runtime.catalog", "--workspace",
+                [sys.executable, *SAFE_PATH, "-m", "neuroweave.runtime.catalog", "--workspace",
                  str(self.workspace.root)],
                 capture_output=True, text=True, timeout=120, cwd=self.workspace.root,
                 check=False,
@@ -117,7 +122,7 @@ class RunManager:
         try:
             with open(run_dir / "worker.log", "ab") as log:
                 process = subprocess.Popen(
-                    [sys.executable, "-m", "neuroweave.runtime.worker", "--workspace",
+                    [sys.executable, *SAFE_PATH, "-m", "neuroweave.runtime.worker", "--workspace",
                      str(self.workspace.root), "--run-id", run.id],
                     cwd=self.workspace.root, stdout=log, stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL, start_new_session=True,
