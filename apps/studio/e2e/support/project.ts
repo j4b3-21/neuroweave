@@ -115,6 +115,10 @@ export class StudioServer {
     return this.output;
   }
 
+  get pid(): number | undefined {
+    return this.process?.pid;
+  }
+
   async start(timeoutMs = 30_000): Promise<void> {
     if (!this.port) this.port = await freePort();
     const child = spawn(pythonExecutable(), [
