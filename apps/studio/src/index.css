@@ -1,0 +1,130 @@
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@xyflow/react/dist/style.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-canvas: #f3f5f7;
+  --color-panel: #ffffff;
+  --color-ink: #18222f;
+  --color-ink-soft: #4a5868;
+  --color-ink-faint: #7b8794;
+  --color-rule: #d9e0e6;
+  --color-rule-soft: #e8edf1;
+  --color-signal: #1d6a85;
+  --color-signal-soft: #e3f0f4;
+
+  --color-ok: #2e7d5b;
+  --color-fail: #b4383a;
+  --color-busy: #b7800f;
+  --color-idle: #8a94a0;
+  --color-reuse: #6b5ba8;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center gap-1.5 rounded-md border border-rule bg-panel px-2.5 py-1
+      text-[13px] font-medium text-ink transition-colors hover:bg-rule-soft
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-signal bg-signal text-white hover:bg-[#175a71];
+  }
+  .btn-danger {
+    @apply text-fail hover:bg-[#fbeeee];
+  }
+  .btn-quiet {
+    @apply border-transparent bg-transparent;
+  }
+  .field {
+    @apply w-full rounded-md border border-rule bg-panel px-2 py-1 text-[13px] text-ink
+      placeholder:text-ink-faint focus:border-signal focus:outline-none;
+  }
+  .panel-title {
+    @apply text-[13px] font-semibold text-ink;
+  }
+  .meta {
+    @apply text-[12px] text-ink-faint;
+  }
+  .hash {
+    @apply font-mono text-[12px] text-ink-soft;
+  }
+  .data-table {
+    @apply w-full border-collapse text-[13px];
+  }
+  .data-table th {
+    @apply border-b border-rule px-3 py-1.5 text-left text-[12px] font-medium text-ink-faint;
+  }
+  .data-table td {
+    @apply border-b border-rule-soft px-3 py-1.5 align-top;
+  }
+}
+
+/* React Flow: quieter chrome that matches the instrument palette. */
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__edge-path {
+  stroke: #9aa7b3;
+  stroke-width: 1.5;
+}
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--color-signal);
+  stroke-width: 2.5;
+}
+.react-flow__edge.nw-invalid .react-flow__edge-path {
+  stroke: var(--color-fail);
+  stroke-dasharray: 5 4;
+}
+.react-flow__edge.nw-inferred .react-flow__edge-path {
+  stroke-dasharray: 3 4;
+}
+.react-flow__handle {
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+}
+.react-flow__controls {
+  box-shadow: none;
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.report-frame {
+  width: 100%;
+  min-height: 560px;
+  border: 0;
+  background: #fff;
+}
