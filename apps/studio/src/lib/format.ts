@@ -37,6 +37,12 @@ export function formatValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** A node execution's error for display. The executor already prefixes failure messages with
+ * the exception type; skipped and cancelled nodes have a message but no type. */
+export function formatNodeError(error: string, errorType: string | null | undefined): string {
+  return !errorType || error.startsWith(`${errorType}:`) ? error : `${errorType}: ${error}`;
+}
+
 export function formatNumber(value: number | null | undefined): string {
   if (value === null || value === undefined) return "—";
   return Math.abs(value) >= 1e5 || (value !== 0 && Math.abs(value) < 1e-3)

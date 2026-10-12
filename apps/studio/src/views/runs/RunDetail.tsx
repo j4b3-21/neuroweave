@@ -5,12 +5,16 @@ import { useState, type ReactNode } from "react";
 import { api, isActive } from "../../api/client";
 import type { Environment, ReproductionReport, RunDetail as RunDetailData } from "../../api/types";
 import { EmptyState, ErrorText, Hash, KeyValue, Section, StatusBadge } from "../../components/common";
-import { formatDuration, formatNumber, formatTime, formatValue, runDuration } from "../../lib/format";
+import {
+  formatDuration, formatNodeError, formatNumber, formatTime, formatValue, runDuration,
+} from "../../lib/format";
 import { useUi } from "../../state/ui";
 
 const VERDICT_TEXT: Record<ReproductionReport["verdict"], { tone: string; text: string }> = {
-  reproduced: { tone: "text-ok", text: "Reproduced: every output is byte-identical to the original." },
-  not_reproduced: { tone: "text-fail", text: "Not reproduced: at least one output differs." },
+  reproduced: { tone: "text-ok", text: "Reproduced: the re-execution produced byte-identical outputs "
+    + "(equal SHA-256) for every output of the original run." },
+  not_reproduced: { tone: "text-fail", text: "Not reproduced: at least one output of the re-execution is "
+    + "missing or differs." },
   failed: { tone: "text-fail", text: "The reproduction run did not succeed." },
   pending: { tone: "text-busy", text: "The reproduction is still running." },
 };
@@ -54,6 +58,11 @@ function ReproductionPanel({ runId, status }: { runId: string; status: string })
           {r.notes.map((note) => <li key={note}>{note}</li>)}
         </ul>
       )}
+      <p className="meta">
+        The snapshot was re-executed on this machine with the same seed, without the cache, using
+        the code and packages installed now. The original environment is not recreated, so a match
+        shows the result repeats here; it is not an independent reproduction.
+      </p>
     </div>
   );
 }
@@ -124,7 +133,7 @@ function NodesTable({ detail }: { detail: RunDetailData }) {
               )}
               {execution.error && (
                 <details className="mt-1 text-[12px] text-fail">
-                  <summary className="cursor-pointer">{execution.error_type}: {execution.error}</summary>
+                  <summary className="cursor-pointer">{formatNodeError(execution.error, execution.error_type)}</summary>
                   <pre className="mt-1 overflow-x-auto font-mono text-[11px] whitespace-pre-wrap">{execution.traceback}</pre>
                 </details>
               )}

@@ -4,8 +4,11 @@ Security model: a single-user, local tool. The server binds to loopback, rejects
 whose Host header is not local (DNS-rebinding protection) and requires the
 ``X-NeuroWeave-Client`` header on state-changing requests. Browsers cannot attach custom
 headers cross-origin without a CORS preflight, which this server never approves, so other
-websites cannot trigger runs. There is no authentication: anyone with local access to the
-port can execute the project's node code.
+websites cannot trigger runs. API requests that a browser labels as coming from another site
+(``Sec-Fetch-Site``) are refused as well, because even a GET such as loading the node
+catalogue imports project code. Code from a project the user has not trusted
+(``neuroweave.store.trust``) is never imported. There is no authentication: anyone with local
+access to the port can execute a trusted project's node code.
 """
 
 from __future__ import annotations
@@ -28,11 +31,16 @@ from neuroweave.provenance import Lineage, downstream_lineage, upstream_lineage
 from neuroweave.server.services import Catalog, CatalogService, RunManager, tail
 from neuroweave.store.artifacts import TEXT_MEDIA_TYPES, ArtifactIntegrityError
 from neuroweave.store.db import ArtifactRecord, MetricRecord, NodeExecutionRecord, RunRecord
+from neuroweave.store.trust import UntrustedProjectError, require_trusted
 from neuroweave.store.workspace import WorkflowNotFoundError, Workspace
 
 STATIC_DIR = Path(__file__).parent / "static"
 CLIENT_HEADER = "x-neuroweave-client"
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
+# Sec-Fetch-Site values a browser sends for the Studio's own requests and for requests the user
+# initiates directly (address bar, bookmarks). Clients that send no such header (curl, the CLI,
+# older browsers) are not affected.
+SAME_ORIGIN_FETCH_SITES = {"same-origin", "none"}
 PREVIEW_LIMIT = 2_000_000
 
 
@@ -136,6 +144,11 @@ def create_app(project_root: Path, *, allowed_hosts_extra: list[str] | tuple[str
     async def local_only(request: Request, call_next):
         if _hostname(request.headers.get("host", "")) not in allowed_hosts:
             return JSONResponse({"detail": "Host not allowed."}, status_code=403)
+        fetch_site = request.headers.get("sec-fetch-site")
+        if (request.url.path.startswith("/api/") and fetch_site is not None
+                and fetch_site not in SAME_ORIGIN_FETCH_SITES):
+            return JSONResponse({"detail": "Cross-site API requests are not allowed."},
+                                status_code=403)
         if (request.method not in ("GET", "HEAD", "OPTIONS")
                 and request.url.path.startswith("/api/")
                 and request.headers.get(CLIENT_HEADER) is None):
@@ -264,6 +277,7 @@ def create_app(project_root: Path, *, allowed_hosts_extra: list[str] | tuple[str
     @app.post("/api/workflows/{workflow_id}/runs", response_model=RunRecord, status_code=202)
     def start_run(workflow_id: str, request: RunRequest) -> RunRecord:
         workflow = load_workflow_or_404(workflow_id)
+        require_trusted(workspace.root, workspace.config.node_modules)
         report = validate(workflow)
         if not report.valid:
             raise HTTPException(status_code=422, detail={
@@ -421,6 +435,10 @@ def create_app(project_root: Path, *, allowed_hosts_extra: list[str] | tuple[str
     @app.exception_handler(ValidationError)
     async def pydantic_error(_: Request, exc: ValidationError) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": exc.errors(include_url=False)})
+
+    @app.exception_handler(UntrustedProjectError)
+    async def untrusted_project(_: Request, exc: UntrustedProjectError) -> JSONResponse:
+        return JSONResponse(status_code=403, content={"detail": str(exc)})
 
     if (STATIC_DIR / "index.html").exists():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="studio")

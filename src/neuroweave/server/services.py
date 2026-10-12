@@ -1,7 +1,8 @@
 """Server-side services: node catalogue discovery and run process management.
 
 Neither service imports project code into the server process. The catalogue is discovered
-by ``neuroweave.runtime.catalog`` and runs execute in ``neuroweave.runtime.worker``.
+by ``neuroweave.runtime.catalog`` and runs execute in ``neuroweave.runtime.worker``, and
+neither process is started for a project the user has not trusted (``neuroweave.store.trust``).
 """
 
 from __future__ import annotations
@@ -22,9 +23,15 @@ from neuroweave.runtime.executor import prepare_run
 from neuroweave.sdk.registry import ModuleLoadError
 from neuroweave.store.db import RunRecord
 from neuroweave.store.files import utc_now
+from neuroweave.store.trust import UntrustedProjectError, needs_trust, require_trusted
 from neuroweave.store.workspace import Workspace
 
 CANCEL_GRACE_SECONDS = 10.0
+# `python -m` runs with the project directory as cwd and would put it first on sys.path, so a
+# project file named like a standard-library module (argparse.py, json.py) would be imported
+# before any NeuroWeave code runs. -P (Python 3.11+) leaves it off; node modules are still
+# imported from the project root, which load_node_modules adds explicitly.
+SAFE_PATH = ("-P",)
 
 
 class Catalog(BaseModel):
@@ -58,7 +65,8 @@ class CatalogService:
             for path in candidates:
                 if path.is_file():
                     stamps.append((str(path), path.stat().st_mtime))
-        return (tuple(config.node_modules), tuple(stamps))
+        trusted = not needs_trust(self.workspace.root, config.node_modules)
+        return (tuple(config.node_modules), tuple(stamps), trusted)
 
     def get(self, *, refresh: bool = False) -> Catalog:
         with self._lock:
@@ -70,8 +78,13 @@ class CatalogService:
 
     def _discover(self) -> Catalog:
         try:
+            require_trusted(self.workspace.root, self.workspace.config.node_modules)
+        except UntrustedProjectError as exc:
+            return Catalog(errors=[ModuleLoadError(module="*", error=str(exc), traceback="")],
+                           loaded_at=utc_now())
+        try:
             completed = subprocess.run(
-                [sys.executable, "-m", "neuroweave.runtime.catalog", "--workspace",
+                [sys.executable, *SAFE_PATH, "-m", "neuroweave.runtime.catalog", "--workspace",
                  str(self.workspace.root)],
                 capture_output=True, text=True, timeout=120, cwd=self.workspace.root,
                 check=False,
@@ -109,6 +122,7 @@ class RunManager:
         self, workflow: Workflow, *, seed: int | None, use_cache: bool, trigger: str = "studio",
         reproduces_run_id: str | None = None,
     ) -> RunRecord:
+        require_trusted(self.workspace.root, self.workspace.config.node_modules)
         db = self.workspace.db
         run = prepare_run(self.workspace, workflow, seed=seed, use_cache=use_cache,
                           trigger=trigger, reproduces_run_id=reproduces_run_id)
@@ -117,7 +131,7 @@ class RunManager:
         try:
             with open(run_dir / "worker.log", "ab") as log:
                 process = subprocess.Popen(
-                    [sys.executable, "-m", "neuroweave.runtime.worker", "--workspace",
+                    [sys.executable, *SAFE_PATH, "-m", "neuroweave.runtime.worker", "--workspace",
                      str(self.workspace.root), "--run-id", run.id],
                     cwd=self.workspace.root, stdout=log, stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL, start_new_session=True,

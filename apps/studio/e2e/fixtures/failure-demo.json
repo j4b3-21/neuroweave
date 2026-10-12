@@ -1,0 +1,18 @@
+{
+  "description": "make_numbers -> explode -> total; explode always raises.",
+  "edges": [
+    {"source": "numbers", "source_port": "output", "target": "explode", "target_port": "values"},
+    {"source": "explode", "source_port": "output", "target": "total", "target_port": "values"}
+  ],
+  "id": "failure-demo",
+  "name": "Failure demo",
+  "nodes": [
+    {"id": "numbers", "type": "e2e_nodes:make_numbers", "params": {"count": 4},
+     "position": {"x": 0, "y": 0}},
+    {"id": "explode", "type": "e2e_nodes:explode", "params": {},
+     "position": {"x": 300, "y": 0}},
+    {"id": "total", "type": "e2e_nodes:total", "params": {},
+     "position": {"x": 600, "y": 0}}
+  ],
+  "schema_version": 1
+}

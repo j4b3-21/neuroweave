@@ -16,9 +16,10 @@ from neuroweave.store.files import utc_now
 
 
 def _git(project_root: Path, *args: str) -> str | None:
+    # A repository's own config can name a command that `git status` runs (core.fsmonitor).
     try:
         result = subprocess.run(
-            ["git", "-C", str(project_root), *args],
+            ["git", "-c", "core.fsmonitor=false", "-C", str(project_root), *args],
             capture_output=True, text=True, timeout=5, check=False,
         )
     except (OSError, subprocess.SubprocessError):

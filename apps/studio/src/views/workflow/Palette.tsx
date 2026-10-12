@@ -44,7 +44,9 @@ export function Palette({ catalog, onAdd }: {
         {catalog && catalog.errors.length > 0 && (
           <button type="button" onClick={() => setView("nodes")}
                   className="mb-2 w-full rounded-md bg-fail/5 px-2 py-1.5 text-left text-[12px] text-fail">
-            {catalog.errors.length} node module(s) failed to load. Details
+            {catalog.errors.some((e) => e.module === "*")
+              ? "The node catalog could not be loaded."
+              : `${catalog.errors.length} node module(s) failed to load.`} Details
           </button>
         )}
         {!catalog && <p className="meta px-1">Loading node catalog…</p>}

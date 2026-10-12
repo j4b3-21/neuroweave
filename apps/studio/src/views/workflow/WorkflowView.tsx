@@ -91,6 +91,7 @@ function Editor({ workflowId }: { workflowId: string }) {
         return {
           id: instance.id,
           type: "nwNode",
+          ariaLabel: `Node ${instance.id}`,
           position: old?.dragging ? old.position : instance.position,
           dragging: old?.dragging,
           measured: old?.measured,
@@ -115,6 +116,7 @@ function Editor({ workflowId }: { workflowId: string }) {
     return {
       id: key, source: e.source, sourceHandle: e.source_port, target: e.target,
       targetHandle: e.target_port,
+      ariaLabel: `Connection ${key}`,
       selected: selection?.kind === "edge" && selection.key === key,
       className: invalidEdges.has(key) ? "nw-invalid" : undefined,
       animated: running && sourceStatus === "SUCCEEDED"
