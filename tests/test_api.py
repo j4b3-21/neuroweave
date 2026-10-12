@@ -108,6 +108,9 @@ def test_run_lifecycle_through_worker_process(client) -> None:
     content = client.get(f"/api/artifacts/{artifact_id}/content")
     assert content.text.startswith("# Rainfall and crop yield")
     assert content.headers["x-content-sha256"] == artifact["artifact"]["content_hash"]
+    assert content.headers["x-content-type-options"] == "nosniff"
+    policy = [p.strip() for p in content.headers["content-security-policy"].split(";")]
+    assert "default-src 'none'" in policy and "sandbox" in policy
     assert client.post(f"/api/artifacts/{artifact_id}/verify", headers=HEADERS).json()["ok"]
 
     lineage = client.get(f"/api/artifacts/{artifact_id}/lineage").json()
