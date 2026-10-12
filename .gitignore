@@ -15,6 +15,9 @@ dist/
 node_modules/
 apps/studio/dist/
 src/neuroweave/server/static/
+apps/studio/playwright-report/
+apps/studio/test-results/
+apps/studio/blob-report/
 
 # Editors / OS
 .idea/

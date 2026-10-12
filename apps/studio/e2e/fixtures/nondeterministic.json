@@ -1,0 +1,11 @@
+{
+  "description": "One node whose output changes on every execution.",
+  "edges": [],
+  "id": "nondeterministic",
+  "name": "Nondeterministic",
+  "nodes": [
+    {"id": "token", "type": "e2e_nodes:random_token", "params": {},
+     "position": {"x": 0, "y": 0}}
+  ],
+  "schema_version": 1
+}
