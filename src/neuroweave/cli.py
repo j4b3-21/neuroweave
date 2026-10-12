@@ -110,12 +110,32 @@ def _table(headers: list[str], rows: list[list[Any]]) -> None:
 
 @app.callback()
 def cli(
+    ctx: typer.Context,
     project: Path | None = typer.Option(
         None, "--project", "-C", help="Project directory (default: search upward from cwd)."
     ),
 ) -> None:
     """NeuroWeave command line interface."""
     _state["project"] = project
+    from neuroweave.onboarding import mark_declined, mark_prompted, should_offer_tutorial
+
+    command = ctx.invoked_subcommand
+    if should_offer_tutorial(command=command, interactive=_interactive()):
+        mark_prompted()
+        typer.echo("New to NeuroWeave? Take a 5-minute guided tutorial now? [y/N] ", nl=False)
+        try:
+            answer = sys.stdin.readline().strip().lower()
+        except EOFError:
+            answer = ""
+        if answer in ("y", "yes"):
+            from neuroweave.tutorial.walkthrough import TutorialError, run_tutor
+
+            try:
+                run_tutor(yes=False)
+            except TutorialError as exc:
+                _fail(str(exc))
+            raise typer.Exit(0)
+        mark_declined()
 
 
 # ------------------------------------------------------------------------------ project
@@ -572,6 +592,38 @@ def env_export(
         _fail(f"Run '{run_id}' has no environment lock.")
     output.write_text(text, encoding="utf-8")
     typer.echo(f"Wrote {output} ({len(text.splitlines())} packages).")
+
+
+# ------------------------------------------------------------------------------ tutor
+
+
+@app.command()
+def tutor(
+    directory: Path | None = typer.Option(
+        None, "--dir",
+        help="Where to create the tutorial project (default: ~/neuroweave-tutorial)."),
+    reset: bool = typer.Option(
+        False, "--reset", help="Recreate the tutorial project from scratch."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Do not pause between chapters."),
+    no_studio: bool = typer.Option(
+        False, "--no-studio", help="Skip opening the Studio at the end."),
+    studio_only: bool = typer.Option(
+        False, "--studio-only",
+        help="Only open the Studio tour for an existing tutorial project."),
+    port: int = typer.Option(8765, help="Port for the Studio."),
+    open_browser: bool = typer.Option(True, "--open/--no-open"),
+) -> None:
+    """Guided walkthrough of NeuroWeave on a bundled sample project, then the Studio tour."""
+    from neuroweave.tutorial.walkthrough import TutorialError, run_tutor
+
+    try:
+        run_tutor(directory, reset=reset, yes=yes, no_studio=no_studio, studio_only=studio_only,
+                  port=port, open_browser=open_browser)
+    except TutorialError as exc:
+        _fail(str(exc))
+    except KeyboardInterrupt:
+        typer.echo("\nTutorial stopped.", err=True)
+        raise typer.Exit(130) from None
 
 
 # ------------------------------------------------------------------------------ studio
