@@ -60,7 +60,7 @@ Projects created before this check existed ask once, the first time they are ope
 | A crafted artifact (SVG, HTML in Markdown) running script in the Studio | Artifact content is served with `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; …; sandbox`; SVG figures are shown via `<img>` (no script execution); Markdown reports are rendered inside `<iframe sandbox="">` (no scripts, opaque origin) with a CSP that blocks network loads |
 | Path traversal via artifact ids or log paths | Artifact hashes are validated as 64 hex characters before touching the filesystem; log paths read by the API and by `nw logs` are resolved and must stay inside `.neuroweave/` |
 | Corrupted stored results | Every stored artifact is addressed by its SHA-256; bytes are re-hashed before reuse and on `nw verify`; pickles are loaded only after their hash matches the recorded value. This detects accidental corruption and edits that do not update the database; it does not authenticate who produced the bytes |
-| Secrets leaking into run records via the environment | Environment variables are not captured; only Python, platform, Git and package metadata is stored |
+| Secrets leaking into run records via the environment | Environment variables are not captured; only Python, platform, Git, package metadata and a pinned lock are stored |
 | Lost or half-written project files after a crash | Atomic writes (temporary file, `fsync`, rename) for workflows, snapshots, artifacts and settings; SQLite transactions for history |
 | Concurrent editors overwriting each other | Workflow saves from the Studio carry the revision they were based on; stale saves are refused (409) |
 
@@ -103,6 +103,13 @@ Projects created before this check existed ask once, the first time they are ope
 - **Denial of service by node code** (memory exhaustion, disk filling). There are no
   resource limits.
 - **Supply-chain risks** in node modules and their dependencies.
+- **Isolated reproduction installs packages.** `nw reproduce --isolated` (and the Studio's
+  "Reproduce in a rebuilt environment") runs `uv pip install` against the package index using
+  the run's recorded lock. It requires a trusted project, refuses source builds by default
+  (`--allow-build` lifts that), and re-reads any `file://` local paths named in the lock.
+  Treat a received lock the way you would treat a received `requirements.txt`: only rebuild
+  environments for runs you trust. This is not a sandbox; node code in the rebuilt
+  environment still runs with your permissions.
 
 ## Requirements for future isolation (not implemented)
 

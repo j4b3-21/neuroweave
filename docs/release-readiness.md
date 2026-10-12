@@ -99,8 +99,8 @@ underneath.
 | Workflow snapshot reconstruction | Verified | Browser test checks the stored snapshot equals the workflow that ran and that `snapshot_hash` equals the saved revision |
 | Incremental reuse is exact | Verified | `tests/test_incremental.py` (three different edit points, revert, reuse chains, fresh process) and `execution.spec.ts` |
 | Meaning of "Reproduced" documented and shown truthfully | Verified | [reproducibility.md](reproducibility.md#what-reproduced-means-exactly); Studio wording corrected (`d094933`), asserted by `reproduction.spec.ts` |
-| Environment reconstruction | Intentionally deferred | Recorded, not reconstructable; roadmap in [reproducibility.md](reproducibility.md#roadmap) |
-| Independent re-execution | Intentionally deferred | Not supported; reproduction runs in the same workspace with current code |
+| Environment reconstruction | Partially verified | Each run stores a pinned lock; `nw reproduce --isolated` rebuilds with `uv` on the same OS. Local network e2e (`NEUROWEAVE_NETWORK_TESTS=1`) reported `verdict=reproduced` and `environment_match=identical`. System libraries are not rebuilt; see [reproducibility.md](reproducibility.md#environment-reconstruction) |
+| Independent re-execution | Intentionally deferred | Even `--isolated` runs on this machine; export-bundle reproduction is still on the roadmap |
 | Tolerance-based equivalence | Intentionally deferred | Exact bytes only |
 
 ## Platforms

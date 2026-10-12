@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { api, isActive } from "../../api/client";
 import type { Environment, ReproductionReport, RunDetail as RunDetailData } from "../../api/types";
 import { EmptyState, ErrorText, Hash, KeyValue, Section, StatusBadge } from "../../components/common";
+import { environmentBadge } from "../../lib/environment";
 import {
   formatDuration, formatNodeError, formatNumber, formatTime, formatValue, runDuration,
 } from "../../lib/format";
@@ -29,15 +30,20 @@ function ReproductionPanel({ runId, status }: { runId: string; status: string })
   if (!report.data) return <p className="meta">Loading verdict…</p>;
   const r = report.data;
   const verdict = VERDICT_TEXT[r.verdict];
+  const env = environmentBadge(r.environment_match, r.isolated);
   const differing = r.outputs.filter((o) => !o.identical);
   return (
     <div className="flex flex-col gap-2">
       <p className={`text-[13px] font-medium ${verdict.tone}`}>{verdict.text}</p>
+      <p className={`text-[12px] font-medium ${env.tone}`} title={env.title} data-tour="env-badge">
+        {env.label}
+      </p>
       <KeyValue rows={[
         ["Original run", <button type="button" className="font-mono text-[12px] text-signal hover:underline"
                                  onClick={() => openRun(r.original_run_id)}>{r.original_run_id}</button>],
         ["Policy", <span title="Outputs must have identical SHA-256 content hashes">{r.policy}</span>],
         ["Outputs compared", `${r.outputs.length} (${differing.length} differ)`],
+        ["Environment", <span title={env.title}>{env.label}</span>],
       ]} />
       {differing.length > 0 && (
         <table className="data-table">
@@ -59,9 +65,13 @@ function ReproductionPanel({ runId, status }: { runId: string; status: string })
         </ul>
       )}
       <p className="meta">
-        The snapshot was re-executed on this machine with the same seed, without the cache, using
-        the code and packages installed now. The original environment is not recreated, so a match
-        shows the result repeats here; it is not an independent reproduction.
+        {r.isolated
+          ? "The snapshot was re-executed in a fresh virtual environment rebuilt from the "
+            + "original run's lock (same OS and architecture required). System libraries are "
+            + "not rebuilt."
+          : "The snapshot was re-executed on this machine with the same seed, without the cache, "
+            + "using the code and packages installed now. Use “Reproduce in a rebuilt environment” "
+            + "to rebuild the original package set with uv first."}
       </p>
     </div>
   );
@@ -84,6 +94,9 @@ function EnvironmentPanel({ environment }: { environment: Environment | null }) 
         ["Git", git ? <span><Hash value={git.commit} /> {git.branch ?? "detached"}
           {git.dirty && <span className="text-busy"> with uncommitted changes</span>}</span>
           : "not a git repository"],
+        ["Lock", environment.lock
+          ? <Hash value={environment.lock.hash} length={16} />
+          : "not recorded"],
         ["Packages", <button type="button" className="text-signal hover:underline"
                              onClick={() => setShowPackages(!showPackages)}>
           {packages.length} installed {showPackages ? "(hide)" : "(show)"}</button>],
@@ -97,7 +110,8 @@ function EnvironmentPanel({ environment }: { environment: Environment | null }) 
           ))}
         </div>
       )}
-      <p className="meta">Environment variables are not recorded, so secrets never enter run records.</p>
+      <p className="meta">Environment variables are not recorded, so secrets never enter run records.
+        Use <span className="font-mono">nw env show</span> to export the pinned lock.</p>
     </div>
   );
 }
@@ -174,10 +188,13 @@ export function RunDetail({ runId }: { runId: string }) {
     void queryClient.invalidateQueries({ queryKey: ["run", runId] });
   };
   const reproduce = useMutation({
-    mutationFn: () => api.reproduce(runId),
-    onSuccess: (run) => {
+    mutationFn: (opts: { isolated?: boolean } = {}) => api.reproduce(runId, opts),
+    onSuccess: (run, opts) => {
       invalidate();
-      toast("Reproduction started with the original snapshot and seed, without the cache.", "info");
+      toast(opts.isolated
+        ? "Rebuilding the original environment with uv, then reproducing inside it."
+        : "Reproduction started with the original snapshot and seed, without the cache.",
+      "info");
       openRun(run.id);
     },
     onError: (error) => toast(error.message),
@@ -202,6 +219,7 @@ export function RunDetail({ runId }: { runId: string }) {
   if (!detail.data) return <p className="meta p-6">Loading run…</p>;
   const { run, workflow, metrics } = detail.data;
   const active = isActive(run.status);
+  const busy = reproduce.isPending || run.status === "CANCELLED";
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto bg-panel">
@@ -213,18 +231,29 @@ export function RunDetail({ runId }: { runId: string }) {
           </div>
           <div className="hash">{run.id}</div>
         </div>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap justify-end gap-2">
           {active ? (
             <button type="button" className="btn btn-danger" onClick={() => cancel.mutate()}
                     disabled={cancel.isPending || run.cancel_requested}>
               <Square size={13} /> {run.cancel_requested ? "Cancelling…" : "Cancel"}
             </button>
           ) : (
-            <button type="button" className="btn" onClick={() => reproduce.mutate()}
-                    disabled={reproduce.isPending || run.status === "CANCELLED"}
-                    title="Re-execute this exact snapshot with the same seed, ignoring the cache, and compare output hashes">
-              <RotateCcw size={13} /> Reproduce
-            </button>
+            <>
+              <button type="button" className="btn" data-tour="reproduce"
+                      onClick={() => reproduce.mutate({})}
+                      disabled={busy}
+                      title="Re-execute this exact snapshot with the same seed, ignoring the cache, and compare output hashes">
+                <RotateCcw size={13} /> Reproduce
+              </button>
+              <button type="button" className="btn" data-tour="reproduce-isolated"
+                      onClick={() => reproduce.mutate({ isolated: true })}
+                      disabled={busy || !run.environment?.lock}
+                      title={run.environment?.lock
+                        ? "Rebuild a fresh virtual environment from this run's lock with uv, then reproduce inside it"
+                        : "This run has no environment lock; re-run it with a current NeuroWeave first"}>
+                <RotateCcw size={13} /> Reproduce in a rebuilt environment
+              </button>
+            </>
           )}
           <button type="button" className="btn" disabled={restore.isPending}
                   title="Replace the current workflow with the version this run executed"

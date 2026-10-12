@@ -126,6 +126,48 @@ def test_run_lifecycle_through_worker_process(client) -> None:
     assert comparison["same_snapshot"]
 
 
+def test_isolated_reproduce_prepares_pending_run(client, monkeypatch) -> None:
+    """The API creates a reproduce-isolated run and launches the isolated entry point.
+
+    The subprocess is stubbed so the test never rebuilds an environment or uses the network.
+    """
+    run_id = client.post("/api/workflows/rainfall-yield/runs", json={},
+                         headers=HEADERS).json()["id"]
+    wait_for(client, run_id)
+
+    launched: list[list[str]] = []
+
+    class FakeProcess:
+        pid = 4242
+
+        def poll(self):
+            return 0
+
+        def send_signal(self, _sig):
+            return None
+
+    def fake_popen(command, **_kwargs):
+        launched.append(list(command))
+        return FakeProcess()
+
+    monkeypatch.setattr("neuroweave.server.services.subprocess.Popen", fake_popen)
+
+    response = client.post(f"/api/runs/{run_id}/reproduce",
+                           json={"isolated": True, "rebuild": True}, headers=HEADERS)
+    assert response.status_code == 202, response.text
+    pending = response.json()
+    assert pending["trigger"] == "reproduce-isolated"
+    assert pending["reproduces_run_id"] == run_id
+    assert pending["use_cache"] is False
+    assert launched and "neuroweave.runtime.isolated" in launched[0]
+    assert "--pending-run-id" in launched[0] and pending["id"] in launched[0]
+    assert "--rebuild" in launched[0]
+
+    bad = client.post(f"/api/runs/{run_id}/reproduce",
+                      json={"rebuild": True}, headers=HEADERS)
+    assert bad.status_code == 400 and "isolated" in bad.json()["detail"]
+
+
 def test_invalid_workflow_is_not_started(client) -> None:
     workflow = client.get("/api/workflows/rainfall-yield").json()
     workflow["nodes"][0]["params"] = {}

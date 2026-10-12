@@ -103,6 +103,13 @@ export interface ValidationReport {
 export type RunStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 export type NodeStatus = RunStatus | "SKIPPED";
 
+export interface EnvironmentLock {
+  format: string;
+  hash: string;
+  local: string[];
+  neuroweave: { version?: string; source?: string; local?: string };
+}
+
 export interface Environment {
   captured_at?: string;
   neuroweave?: string;
@@ -110,6 +117,8 @@ export interface Environment {
   platform?: { system: string; release: string; machine: string };
   git?: { commit: string; branch: string | null; dirty: boolean } | null;
   packages?: Record<string, string>;
+  lock?: EnvironmentLock;
+  project_lockfiles?: { path: string; hash: string }[];
 }
 
 export interface RunRecord {
@@ -207,6 +216,7 @@ export interface ProjectInfo {
   version: string;
   workflow_count: number;
   run_count: number;
+  tutorial: boolean;
 }
 
 export interface WorkflowSummary {
@@ -327,5 +337,7 @@ export interface ReproductionReport {
              identical: boolean }[];
   code_changed_nodes: string[];
   environment_differences: Record<string, unknown>;
+  environment_match: "identical" | "different" | "unknown";
+  isolated: boolean;
   notes: string[];
 }

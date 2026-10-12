@@ -107,7 +107,7 @@ export function BottomPanel({ validation, detail }: {
     ["logs", "Logs"],
   ];
   return (
-    <div className="flex shrink-0 flex-col border-t border-rule bg-panel">
+    <div className="flex shrink-0 flex-col border-t border-rule bg-panel" data-tour="bottom">
       <div className="flex h-8 items-center gap-1 px-2" role="tablist">
         {tabs.map(([tab, label]) => (
           <button key={tab} type="button" role="tab" aria-selected={bottomOpen && bottomTab === tab}

@@ -138,7 +138,7 @@ def execute_run(
 
     emit = on_event or (lambda event: None)
     db.update_run(run_id, status="RUNNING", started_at=utc_now(), worker_pid=os.getpid(),
-                  environment=capture_environment(workspace.root))
+                  environment=capture_environment(workspace.root, workspace.artifacts))
     emit(RunEvent("run_started", run_id))
     status, error = "FAILED", None
     try:

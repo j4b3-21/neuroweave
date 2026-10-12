@@ -155,3 +155,45 @@ the frontend has no independent notion of type compatibility beyond structural c
 
 **Decision.** `requires-python >= 3.11` (uses `contextlib.chdir`, modern typing). CI tests
 3.11 and 3.14.
+
+## D17. Pinned environment lock with each run
+
+**Context.** The name→version package map recorded with each run was not installable
+(editable and VCS installs looked like plain versions) and project lockfiles were ignored.
+**Decision.** Each run stores a deterministic requirements-format lock in the artifact store
+(index packages as `name==version`, VCS and local installs via PEP 610 `direct_url.json`)
+plus copies of any project `uv.lock` / `requirements*.txt` / `poetry.lock`. NeuroWeave
+itself is excluded from the pinned lines and recorded separately. Reproduction reports
+`environment_match` from lock hashes without changing the meaning of *reproduced*.
+**Alternatives.** Recording only `uv.lock` (misses the interpreter's actual installs);
+`pip freeze` alone (loses VCS/local classification).
+**Consequences.** `nw env show` / `nw env export` and isolated rebuild become possible.
+Local `file://` packages can only be rebuilt while their paths still exist.
+
+## D18. Isolated reproduction via uv, not a container
+
+**Context.** Users asked for a "reproduced" verdict that means more about the environment.
+**Decision.** `nw reproduce --isolated` rebuilds a fresh venv with `uv venv --python` and
+`uv pip install --no-deps --no-build -r lock`, installs NeuroWeave specially, caches the
+env under `.neuroweave/envs/<lockhash>/`, and runs the worker with that interpreter. Source
+builds are refused by default. No Docker for now.
+**Alternatives.** Docker/OCI images (stronger isolation, heavier dependency); Nix; full
+`uv sync` from the project's lockfile.
+**Consequences.** Same OS and architecture required; system libraries are not rebuilt; the
+verdict stays exact-content-hash and `environment_match` reports lock equality beside it.
+See [reproducibility.md](reproducibility.md#environment-reconstruction).
+
+## D19. Guided onboarding via `nw tutor` and a Studio tour
+
+**Context.** New users need a path that exercises real CLI commands and the Studio without
+copying example folders by hand.
+**Decision.** Ship the research demo as package data (`neuroweave.tutorial.assets`), expose
+`nw tutor` to materialize it, run real `nw` subprocesses chapter by chapter, then open
+`nw studio` with `#tour`. Offer the tutorial once on first interactive CLI use
+(`~/.config/neuroweave/onboarding.json`; silent under CI / non-TTY /
+`NEUROWEAVE_NO_ONBOARDING`). The Studio tour is dependency-free (spotlight + popover over
+`data-tour` anchors), with a first-visit welcome dialog and Help → Take the tour.
+**Alternatives.** External docs-only onboarding; a third-party tour library; embedding a
+video.
+**Consequences.** Tutorial assets must stay in lockstep with `examples/research_demo`
+(drift test). The Studio tour skips demo-specific steps on non-tutorial projects.

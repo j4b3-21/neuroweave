@@ -7,7 +7,7 @@ import { expect, openStudio, test } from "./support/fixtures";
 async function reproduceFromRunDetail(page: Page, runId: string): Promise<string> {
   const started = page.waitForResponse((r) => r.request().method() === "POST"
     && r.url().endsWith(`/api/runs/${runId}/reproduce`));
-  await page.getByRole("button", { name: "Reproduce" }).click();
+  await page.getByRole("button", { name: "Reproduce", exact: true }).click();
   const response = await started;
   expect(response.status()).toBe(202);
   return (await response.json()).id as string;
@@ -51,7 +51,8 @@ test("reproduces a deterministic run under the exact-content-hash policy", async
   await expect(verdict).toContainText("Reproduced: the re-execution produced byte-identical outputs (equal SHA-256)");
   await expect(verdict).toContainText(report.policy);
   await expect(verdict).toContainText(`${original.nodes.length} (0 differ)`);
-  await expect(verdict).toContainText("The original environment is not recreated");
+  await expect(verdict).toContainText("Same environment");
+  await expect(verdict).toContainText("Reproduce in a rebuilt environment");
   await expect(verdict.getByRole("button", { name: original.run.id })).toBeVisible();
 
   // The original run lists its reproduction.

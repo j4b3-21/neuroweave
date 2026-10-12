@@ -123,17 +123,48 @@ class RunManager:
         reproduces_run_id: str | None = None,
     ) -> RunRecord:
         require_trusted(self.workspace.root, self.workspace.config.node_modules)
-        db = self.workspace.db
         run = prepare_run(self.workspace, workflow, seed=seed, use_cache=use_cache,
                           trigger=trigger, reproduces_run_id=reproduces_run_id)
+        return self._launch(
+            run,
+            [sys.executable, *SAFE_PATH, "-m", "neuroweave.runtime.worker", "--workspace",
+             str(self.workspace.root), "--run-id", run.id],
+        )
+
+    def start_isolated(
+        self, original_run_id: str, *, rebuild: bool = False, allow_build: bool = False,
+    ) -> RunRecord:
+        """Prepare a reproduction run and rebuild the original environment in a subprocess."""
+        from neuroweave.runtime.isolated import (
+            IsolatedReproductionError,
+            prepare_isolated_reproduction,
+        )
+
+        require_trusted(self.workspace.root, self.workspace.config.node_modules)
+        try:
+            _original, pending = prepare_isolated_reproduction(self.workspace, original_run_id)
+        except (IsolatedReproductionError, KeyError) as exc:
+            raise ValueError(str(exc)) from exc
+        command = [
+            sys.executable, *SAFE_PATH, "-m", "neuroweave.runtime.isolated",
+            "--workspace", str(self.workspace.root),
+            "--run-id", original_run_id,
+            "--pending-run-id", pending.id,
+        ]
+        if rebuild:
+            command.append("--rebuild")
+        if allow_build:
+            command.append("--allow-build")
+        return self._launch(pending, command)
+
+    def _launch(self, run: RunRecord, command: list[str]) -> RunRecord:
+        db = self.workspace.db
         run_dir = self.workspace.run_dir(run.id)
         run_dir.mkdir(parents=True, exist_ok=True)
         try:
             with open(run_dir / "worker.log", "ab") as log:
                 process = subprocess.Popen(
-                    [sys.executable, *SAFE_PATH, "-m", "neuroweave.runtime.worker", "--workspace",
-                     str(self.workspace.root), "--run-id", run.id],
-                    cwd=self.workspace.root, stdout=log, stderr=subprocess.STDOUT,
+                    command, cwd=self.workspace.root, stdout=log, stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL, start_new_session=True,
                 )
         except OSError as exc:

@@ -40,10 +40,18 @@ export const test = base.extend<Fixtures>({
   },
 
   // Guard rails for every page: no request may leave the machine, and an uncaught exception in
-  // the Studio fails the test.
+  // the Studio fails the test. Pre-dismiss the first-visit welcome dialog so other specs stay
+  // focused on their own flows (tour.spec.ts covers the dialog itself).
   page: async ({ page }, use) => {
     const external: string[] = [];
     const pageErrors: string[] = [];
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem("neuroweave.tour.welcome", "1");
+      } catch {
+        /* ignore */
+      }
+    });
     await page.route((url) => !isLocal(url.href), (route) => {
       external.push(route.request().url());
       return route.abort();

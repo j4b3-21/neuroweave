@@ -21,6 +21,10 @@ workflows you did not write.
 Requirements: Python 3.11 or newer. Node.js 20+ is needed only to build the Studio from
 source.
 
+**New here?** After installing, run `nw tutor` for a five-minute guided walkthrough on a
+bundled sample project. It ends by opening the Studio with an in-browser tour. You can
+reopen the tour anytime from Help → Take the tour.
+
 ```bash
 git clone https://github.com/j4b3-21/neuroweave.git
 cd neuroweave
@@ -30,10 +34,12 @@ pip install -e ".[dev]"
 # Build the Studio UI once (the API and CLI work without it)
 npm --prefix apps/studio install
 npm --prefix apps/studio run build
+
+nw tutor                       # guided terminal walkthrough + Studio tour
 ```
 
-Run the bundled research demo (load a CSV, validate, transform, compute statistics,
-bootstrap a confidence interval, plot, write a report):
+Or run the bundled research demo yourself (load a CSV, validate, transform, compute
+statistics, bootstrap a confidence interval, plot, write a report):
 
 ```bash
 cp -R examples/research_demo /tmp/nw-demo && cd /tmp/nw-demo
@@ -112,7 +118,9 @@ from the current directory.
 | `nw verify [ID] [--all]` | Re-hash stored bytes and detect tampering or corruption |
 | `nw lineage ID [--downstream] [--json]` | Trace what produced (or used) an artifact |
 | `nw compare RUN_A RUN_B [--json]` | Diff snapshots, parameters, inputs, code, outputs, metrics, environment |
-| `nw reproduce RUN` | Re-execute with the same snapshot and seed, no cache, and compare output hashes |
+| `nw reproduce RUN [--isolated] [--rebuild] [--allow-build]` | Re-execute with the same snapshot and seed, no cache, and compare output hashes; `--isolated` rebuilds the recorded environment with `uv` first |
+| `nw env show RUN` / `nw env export RUN [-o FILE]` | Inspect or write the run's pinned environment lock |
+| `nw tutor [--dir DIR] [--reset] [--yes] [--no-studio] [--studio-only]` | Guided walkthrough on a bundled sample; opens the Studio tour |
 | `nw studio [--port 8765] [--no-open]` | Serve the Studio and API on localhost |
 
 ## Studio
@@ -130,6 +138,7 @@ the CLI uses and shows the same run records.
 - **Artifacts**: previews for tables, figures, Markdown reports, JSON and text; integrity
   verification; download; an interactive lineage graph upstream or downstream.
 - **Node catalog** and **Project settings** (node modules, default seed).
+- **Guided tour**: first-visit welcome dialog, Help → Take the tour, or open with `#tour`.
 
 For frontend development, run `nw studio --no-open` in a project and, in another terminal,
 `npm --prefix apps/studio run dev` (Vite proxies `/api` to port 8765, or `NEUROWEAVE_PORT`).
@@ -183,9 +192,11 @@ docs/
   importing code from a project you did not create, but that is a confirmation step, not
   isolation: only trust node modules (and received `.neuroweave/` stores, which may contain
   pickles) that you would run as an ordinary Python script.
-- **Reproducibility is evidence, not a guarantee.** NeuroWeave records the environment but
-  does not recreate it, and the code hash covers only the node function's own source. See
-  [docs/reproducibility.md](docs/reproducibility.md) for what is and is not detected.
+- **Reproducibility is evidence, not a guarantee.** Each run stores a pinned environment
+  lock; `nw reproduce --isolated` rebuilds Python packages from that lock with `uv` on the
+  same OS and architecture, but system libraries are not rebuilt and the code hash covers
+  only the node function's own source. See [docs/reproducibility.md](docs/reproducibility.md)
+  for what is and is not detected.
 - **Sequential execution** of nodes in one worker process per run; no parallelism or
   distributed execution yet.
 - **Python only.** Nodes in other languages are not supported.

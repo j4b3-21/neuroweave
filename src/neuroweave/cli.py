@@ -29,6 +29,8 @@ app = typer.Typer(add_completion=False, help="NeuroWeave command line interface.
                   no_args_is_help=True)
 workflows_app = typer.Typer(help="Manage workflow definitions.", no_args_is_help=True)
 app.add_typer(workflows_app, name="workflows")
+env_app = typer.Typer(help="Inspect a run's recorded environment lock.", no_args_is_help=True)
+app.add_typer(env_app, name="env")
 
 _state: dict[str, Any] = {"project": None}
 
@@ -108,12 +110,32 @@ def _table(headers: list[str], rows: list[list[Any]]) -> None:
 
 @app.callback()
 def cli(
+    ctx: typer.Context,
     project: Path | None = typer.Option(
         None, "--project", "-C", help="Project directory (default: search upward from cwd)."
     ),
 ) -> None:
     """NeuroWeave command line interface."""
     _state["project"] = project
+    from neuroweave.onboarding import mark_declined, mark_prompted, should_offer_tutorial
+
+    command = ctx.invoked_subcommand
+    if should_offer_tutorial(command=command, interactive=_interactive()):
+        mark_prompted()
+        typer.echo("New to NeuroWeave? Take a 5-minute guided tutorial now? [y/N] ", nl=False)
+        try:
+            answer = sys.stdin.readline().strip().lower()
+        except EOFError:
+            answer = ""
+        if answer in ("y", "yes"):
+            from neuroweave.tutorial.walkthrough import TutorialError, run_tutor
+
+            try:
+                run_tutor(yes=False)
+            except TutorialError as exc:
+                _fail(str(exc))
+            raise typer.Exit(0)
+        mark_declined()
 
 
 # ------------------------------------------------------------------------------ project
@@ -473,15 +495,42 @@ def compare(run_a: str, run_b: str, as_json: bool = typer.Option(False, "--json"
 
 
 @app.command()
-def reproduce(run_id: str) -> None:
+def reproduce(
+    run_id: str,
+    isolated: bool = typer.Option(
+        False, "--isolated",
+        help="Rebuild the run's recorded environment with uv and reproduce inside it."),
+    rebuild: bool = typer.Option(
+        False, "--rebuild",
+        help="With --isolated, discard any cached rebuilt environment for this lock."),
+    allow_build: bool = typer.Option(
+        False, "--allow-build",
+        help="With --isolated, allow source builds while installing packages."),
+) -> None:
     """Re-execute a run's snapshot (same seed, no cache) and check outputs are identical."""
     from neuroweave.experiments import reproduce_run
 
     workspace = _workspace()
     _get_run(workspace, run_id)
-    registry = _load_registry(workspace)
-    report = reproduce_run(workspace, run_id, registry, on_event=_print_event)
+    if isolated:
+        from neuroweave.runtime.isolated import IsolatedReproductionError, reproduce_isolated
+
+        try:
+            report, env_dir = reproduce_isolated(
+                workspace, run_id, allow_build=allow_build, rebuild=rebuild,
+                log=lambda message: typer.echo(message, err=True),
+            )
+        except IsolatedReproductionError as exc:
+            _fail(str(exc))
+        typer.echo(f"Isolated environment: {env_dir}")
+    else:
+        if rebuild or allow_build:
+            _fail("--rebuild and --allow-build require --isolated.")
+        registry = _load_registry(workspace)
+        report = reproduce_run(workspace, run_id, registry, on_event=_print_event)
     typer.echo(f"Policy: {report.policy}")
+    typer.echo(f"Environment: {report.environment_match}"
+               + (" (rebuilt)" if report.isolated else ""))
     for check in report.outputs:
         mark = "identical" if check.identical else "DIFFERENT"
         typer.echo(f"  {check.node_id}.{check.port}: {mark}")
@@ -490,6 +539,91 @@ def reproduce(run_id: str) -> None:
     typer.echo(f"Verdict: {report.verdict} (reproduction run {report.reproduction_run_id})")
     if report.verdict != "reproduced":
         raise typer.Exit(1)
+
+
+# ------------------------------------------------------------------------------ env
+
+
+@env_app.command("show")
+def env_show(run_id: str) -> None:
+    """Print the pinned environment lock and project lockfiles recorded for a run."""
+    from neuroweave.runtime.environment import lock_text_from_environment
+
+    workspace = _workspace()
+    record = _get_run(workspace, run_id)
+    environment = record.environment or {}
+    lock = environment.get("lock")
+    if not isinstance(lock, dict) or not lock.get("hash"):
+        _fail(f"Run '{run_id}' has no environment lock. Re-run the workflow with a current "
+              "NeuroWeave to record one.")
+    typer.echo(f"Run {run_id}")
+    typer.echo(f"Python {environment.get('python', {}).get('version', '?')} "
+               f"({environment.get('platform', {}).get('system', '?')} "
+               f"{environment.get('platform', {}).get('machine', '?')})")
+    typer.echo(f"Lock hash: {lock['hash']}")
+    if lock.get("local"):
+        typer.echo("Local packages: " + ", ".join(lock["local"]))
+    nw = lock.get("neuroweave") or {}
+    if nw:
+        typer.echo(f"NeuroWeave: {nw.get('version', '?')} ({nw.get('source', '?')})")
+    typer.echo("")
+    typer.echo(lock_text_from_environment(workspace.artifacts, environment), nl=False)
+    project = environment.get("project_lockfiles") or []
+    if project:
+        typer.echo("\nProject lockfiles:")
+        for entry in project:
+            typer.echo(f"  {entry['path']}  {entry['hash']}")
+
+
+@env_app.command("export")
+def env_export(
+    run_id: str,
+    output: Path = typer.Option(Path("requirements.txt"), "-o", "--output",
+                                help="File to write the lock to."),
+) -> None:
+    """Write the run's pinned environment lock to a requirements file."""
+    from neuroweave.runtime.environment import lock_text_from_environment
+
+    workspace = _workspace()
+    record = _get_run(workspace, run_id)
+    try:
+        text = lock_text_from_environment(workspace.artifacts, record.environment or {})
+    except KeyError:
+        _fail(f"Run '{run_id}' has no environment lock.")
+    output.write_text(text, encoding="utf-8")
+    typer.echo(f"Wrote {output} ({len(text.splitlines())} packages).")
+
+
+# ------------------------------------------------------------------------------ tutor
+
+
+@app.command()
+def tutor(
+    directory: Path | None = typer.Option(
+        None, "--dir",
+        help="Where to create the tutorial project (default: ~/neuroweave-tutorial)."),
+    reset: bool = typer.Option(
+        False, "--reset", help="Recreate the tutorial project from scratch."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Do not pause between chapters."),
+    no_studio: bool = typer.Option(
+        False, "--no-studio", help="Skip opening the Studio at the end."),
+    studio_only: bool = typer.Option(
+        False, "--studio-only",
+        help="Only open the Studio tour for an existing tutorial project."),
+    port: int = typer.Option(8765, help="Port for the Studio."),
+    open_browser: bool = typer.Option(True, "--open/--no-open"),
+) -> None:
+    """Guided walkthrough of NeuroWeave on a bundled sample project, then the Studio tour."""
+    from neuroweave.tutorial.walkthrough import TutorialError, run_tutor
+
+    try:
+        run_tutor(directory, reset=reset, yes=yes, no_studio=no_studio, studio_only=studio_only,
+                  port=port, open_browser=open_browser)
+    except TutorialError as exc:
+        _fail(str(exc))
+    except KeyboardInterrupt:
+        typer.echo("\nTutorial stopped.", err=True)
+        raise typer.Exit(130) from None
 
 
 # ------------------------------------------------------------------------------ studio

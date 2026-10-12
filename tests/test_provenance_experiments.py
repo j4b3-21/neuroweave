@@ -7,7 +7,7 @@ from neuroweave.experiments import compare_runs, reproduce_run, reproduction_rep
 from neuroweave.kernel import Edge, NodeInstance, Workflow
 from neuroweave.provenance import downstream_lineage, upstream_lineage
 from neuroweave.runtime import run_workflow
-from neuroweave.runtime.executor import prepare_run
+from neuroweave.runtime.executor import execute_run, prepare_run
 
 
 def test_pending_reproduction_does_not_report_spurious_differences(
@@ -93,6 +93,36 @@ def test_reproduce_deterministic_example(demo_project, demo_registry) -> None:
     reproduction = demo_project.db.get_run(report.reproduction_run_id)
     assert reproduction.reproduces_run_id == run.id and not reproduction.use_cache
     assert not any(e.cache_hit for e in demo_project.db.node_executions(reproduction.id))
+    assert report.environment_match == "identical"
+    assert report.isolated is False
+    assert any("environment lock matches" in note for note in report.notes)
+
+
+def test_reproduction_environment_match_unknown_without_lock(demo_project, demo_registry) -> None:
+    workflow = demo_project.load_workflow("rainfall-yield")
+    original = run_workflow(demo_project, workflow, demo_registry)
+    # Simulate a run recorded before locks existed.
+    demo_project.db.update_run(original.id, environment={
+        "python": original.environment["python"],
+        "packages": original.environment["packages"],
+    })
+    report = reproduce_run(demo_project, original.id, demo_registry)
+    assert report.verdict == "reproduced"
+    assert report.environment_match == "unknown"
+    assert any("no environment lock" in note for note in report.notes)
+
+
+def test_reproduction_isolated_flag_from_trigger(demo_project, demo_registry) -> None:
+    workflow = demo_project.load_workflow("rainfall-yield")
+    original = run_workflow(demo_project, workflow, demo_registry)
+    pending = prepare_run(demo_project, workflow, seed=original.seed, use_cache=False,
+                          trigger="reproduce-isolated", reproduces_run_id=original.id)
+    execute_run(demo_project, pending.id, demo_registry)
+    report = reproduction_report(demo_project, pending.id)
+    assert report.verdict == "reproduced"
+    assert report.isolated is True
+    assert report.environment_match == "identical"
+    assert any("rebuilt environment" in note for note in report.notes)
 
 
 def test_reproduce_detects_nondeterminism(workspace, registry) -> None:
