@@ -20,7 +20,9 @@ end of each working session.
 
 ### Test results
 
-- Python: 101 tests pass on CPython 3.14 (`pytest -q`, about 5 s); `ruff check` clean.
+- Python: 101 tests pass on CPython 3.14 and 3.11 locally (`pytest -q`, about 5 s);
+  `ruff check` clean.
+- GitHub Actions (Ubuntu): the Python 3.11, Python 3.14 and Studio jobs pass.
 - Studio: TypeScript strict typecheck clean; 5 Vitest tests pass; production build succeeds
   (one 570 KB JavaScript chunk, 176 KB gzipped).
 - All tests use temporary directories and make no network calls.
