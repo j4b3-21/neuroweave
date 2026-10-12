@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# NeuroWeave workspaces created by examples and local experimentation
+.neuroweave/
+
+# Studio
+node_modules/
+apps/studio/dist/
+src/neuroweave/server/static/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

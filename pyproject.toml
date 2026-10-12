@@ -1,0 +1,17 @@
+[project]
+name = "neuroweave"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "typer>=0.12,<1",
+]
+
+[project.scripts]
+nw = "src.cli.main:main"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["src", "src.*"]
