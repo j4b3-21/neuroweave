@@ -160,10 +160,22 @@ Vitest / Playwright tests passed.
 - No garbage collection for artifact blobs or snapshots that are no longer referenced.
 - Run history has no pagination beyond the API's `limit` parameter.
 
+## Session: environment lock and isolated reproduction
+
+| Commit | Message | Scope | Tests | Result |
+|---|---|---|---|---|
+| `5123014` | feat(runtime): record a pinned environment lock and project lockfiles with each run | `environment.py`, executor | `test_environment_lock.py` + related | pass |
+| `7b703a1` | feat(experiments): report whether a reproduction ran in the same environment | `experiments.py` | `test_provenance_experiments.py` | pass |
+| `a18a4f6` | feat(runtime): rebuild a run's environment with uv | `runtime/isolated.py` | `test_isolated.py` (fake runner) | pass |
+| `50750a5` | feat(cli): add nw reproduce --isolated and nw env show/export | `cli.py` | `test_cli.py` | pass |
+| `3933080` | feat(server): support isolated reproduction from the API | `server/` | `test_api.py` | pass |
+| `ece2d53` | feat(studio): show the environment match and offer reproduction in a rebuilt environment | Studio | Vitest 12, Playwright 12 | pass |
+| `cf4d061` | test(runtime): add opt-in network e2e for isolated reproduction | network e2e | `NEUROWEAVE_NETWORK_TESTS=1` once locally: reproduced + identical | pass |
+
 ## Next highest-priority tasks
 
 1. **Run CI on GitHub** for these commits (push a branch; owner action) and fix anything the
-   Ubuntu runners reveal, especially in the new browser job.
+   Ubuntu runners reveal, especially in the browser job.
 2. **Release prerequisites**: choose a license; lock Python dependencies (`uv.lock`) and add
    a dependency audit to CI; start a changelog.
 3. **Reproduction status model** (`repeated`, `repeated_with_changes`, `partial`) from data

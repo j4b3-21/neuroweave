@@ -112,7 +112,8 @@ from the current directory.
 | `nw verify [ID] [--all]` | Re-hash stored bytes and detect tampering or corruption |
 | `nw lineage ID [--downstream] [--json]` | Trace what produced (or used) an artifact |
 | `nw compare RUN_A RUN_B [--json]` | Diff snapshots, parameters, inputs, code, outputs, metrics, environment |
-| `nw reproduce RUN` | Re-execute with the same snapshot and seed, no cache, and compare output hashes |
+| `nw reproduce RUN [--isolated] [--rebuild] [--allow-build]` | Re-execute with the same snapshot and seed, no cache, and compare output hashes; `--isolated` rebuilds the recorded environment with `uv` first |
+| `nw env show RUN` / `nw env export RUN [-o FILE]` | Inspect or write the run's pinned environment lock |
 | `nw studio [--port 8765] [--no-open]` | Serve the Studio and API on localhost |
 
 ## Studio
@@ -183,9 +184,11 @@ docs/
   importing code from a project you did not create, but that is a confirmation step, not
   isolation: only trust node modules (and received `.neuroweave/` stores, which may contain
   pickles) that you would run as an ordinary Python script.
-- **Reproducibility is evidence, not a guarantee.** NeuroWeave records the environment but
-  does not recreate it, and the code hash covers only the node function's own source. See
-  [docs/reproducibility.md](docs/reproducibility.md) for what is and is not detected.
+- **Reproducibility is evidence, not a guarantee.** Each run stores a pinned environment
+  lock; `nw reproduce --isolated` rebuilds Python packages from that lock with `uv` on the
+  same OS and architecture, but system libraries are not rebuilt and the code hash covers
+  only the node function's own source. See [docs/reproducibility.md](docs/reproducibility.md)
+  for what is and is not detected.
 - **Sequential execution** of nodes in one worker process per run; no parallelism or
   distributed execution yet.
 - **Python only.** Nodes in other languages are not supported.
