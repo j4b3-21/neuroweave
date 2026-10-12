@@ -3,10 +3,24 @@ from __future__ import annotations
 import os
 
 from neuroweave import node
-from neuroweave.experiments import compare_runs, reproduce_run
+from neuroweave.experiments import compare_runs, reproduce_run, reproduction_report
 from neuroweave.kernel import Edge, NodeInstance, Workflow
 from neuroweave.provenance import downstream_lineage, upstream_lineage
 from neuroweave.runtime import run_workflow
+from neuroweave.runtime.executor import prepare_run
+
+
+def test_pending_reproduction_does_not_report_spurious_differences(
+        demo_project, demo_registry) -> None:
+    workflow = demo_project.load_workflow("rainfall-yield")
+    original = run_workflow(demo_project, workflow, demo_registry)
+    pending = prepare_run(demo_project, workflow, seed=original.seed, use_cache=False,
+                          trigger="reproduce", reproduces_run_id=original.id)
+    report = reproduction_report(demo_project, pending.id)
+    assert report.verdict == "pending"
+    assert report.code_changed_nodes == []
+    assert report.environment_differences == {}
+    assert any("not finished" in note for note in report.notes)
 
 
 def report_artifact(ws, run):

@@ -465,6 +465,7 @@ def studio(
                    "run build`.", err=True)
     url = f"http://{host}:{port}"
     typer.echo(f"NeuroWeave Studio for {workspace.root} at {url}")
+    typer.echo("Node code runs with your user permissions (no sandbox). Press Ctrl+C to stop.")
     if open_browser:
         import threading
         import webbrowser

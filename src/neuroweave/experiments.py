@@ -78,7 +78,9 @@ def _outputs(workspace: Workspace, execution: NodeExecutionRecord) -> dict[str, 
 
 
 def _environment_diff(a: dict | None, b: dict | None) -> dict[str, Any]:
-    a, b = a or {}, b or {}
+    """Differences between two captured environments; empty if either was never captured."""
+    if not a or not b:
+        return {}
     diff: dict[str, Any] = {}
     for section in ("python", "platform", "git", "neuroweave"):
         if a.get(section) != b.get(section):
@@ -123,7 +125,8 @@ def compare_runs(workspace: Workspace, run_a_id: str, run_b_id: str) -> RunCompa
             status=(a and a.status, b and b.status),
             definition=(a and a.definition_id, b and b.definition_id),
             version=(a and a.definition_version, b and b.definition_version),
-            code_changed=bool(a and b and a.code_hash != b.code_hash),
+            code_changed=bool(a and b and a.code_hash and b.code_hash
+                              and a.code_hash != b.code_hash),
             cache_hit=(a and a.cache_hit, b and b.cache_hit),
             duration_ms=(a and a.duration_ms, b and b.duration_ms),
         )
@@ -221,16 +224,19 @@ def reproduction_report(workspace: Workspace, reproduction_run_id: str) -> Repro
         for n in comparison.nodes for port, o in n.outputs.items() if o.a is not None
     ]
     code_changed = [n.node_id for n in comparison.nodes
-                    if n.code_changed or n.version[0] != n.version[1]]
+                    if n.code_changed or (None not in n.version and n.version[0] != n.version[1])]
     notes: list[str] = []
     if original.status != "SUCCEEDED":
         notes.append(f"The original run ended {original.status}; only its recorded outputs "
                      "are compared.")
-    if code_changed:
+    if run.status in ("PENDING", "RUNNING"):
+        notes.append("The reproduction has not finished; outputs not yet produced are shown "
+                     "as missing.")
+    elif code_changed:
         notes.append("Node code or version differs from the original run for: "
                      + ", ".join(code_changed) + ". The reproduction used the current code, so "
                      "differences may reflect code changes rather than nondeterminism.")
-    if any(n.input_changes for n in comparison.nodes):
+    if any(n.input_changes for n in comparison.nodes) and run.status not in ("PENDING", "RUNNING"):
         notes.append("Some external inputs changed since the original run.")
     if comparison.environment:
         notes.append("The runtime environment differs: " + ", ".join(comparison.environment)

@@ -14,7 +14,7 @@ import contextlib
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError
@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, ValidationError
 from neuroweave import __version__
 from neuroweave.experiments import RunComparison, compare_runs, reproduction_report
 from neuroweave.kernel.model import WORKFLOW_ID_PATTERN, Workflow
+from neuroweave.kernel.serialization import snapshot_hash as workflow_revision
 from neuroweave.kernel.validation import ValidationReport, validate_workflow
 from neuroweave.provenance import Lineage, downstream_lineage, upstream_lineage
 from neuroweave.server.services import Catalog, CatalogService, RunManager, tail
@@ -31,7 +32,7 @@ from neuroweave.store.workspace import WorkflowNotFoundError, Workspace
 
 STATIC_DIR = Path(__file__).parent / "static"
 CLIENT_HEADER = "x-neuroweave-client"
-LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]", "testserver"}
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
 PREVIEW_LIMIT = 2_000_000
 
 
@@ -69,6 +70,7 @@ class WorkflowSummary(BaseModel):
 class SavedWorkflow(BaseModel):
     workflow: Workflow
     validation: ValidationReport
+    revision: str
 
 
 class RunRequest(BaseModel):
@@ -223,15 +225,29 @@ def create_app(project_root: Path, *, allowed_hosts_extra: list[str] | tuple[str
         return workflow
 
     @app.get("/api/workflows/{workflow_id}", response_model=Workflow)
-    def get_workflow(workflow_id: str) -> Workflow:
-        return load_workflow_or_404(workflow_id)
+    def get_workflow(workflow_id: str, response: Response) -> Workflow:
+        workflow = load_workflow_or_404(workflow_id)
+        response.headers["ETag"] = f'"{workflow_revision(workflow)}"'
+        return workflow
 
     @app.put("/api/workflows/{workflow_id}", response_model=SavedWorkflow)
-    def save_workflow(workflow_id: str, workflow: Workflow) -> SavedWorkflow:
+    def save_workflow(workflow_id: str, workflow: Workflow,
+                      if_match: str | None = Header(default=None)) -> SavedWorkflow:
+        """Save a workflow. With ``If-Match``, the save is refused (409) when the stored
+        version is no longer the one the client edited, so concurrent editors (another Studio
+        tab, ``nw workflows import --force``) never silently overwrite each other."""
         if workflow.id != workflow_id:
             raise HTTPException(status_code=400, detail="Workflow id in body does not match URL.")
+        if if_match is not None and workspace.workflow_exists(workflow_id):
+            current = workflow_revision(load_workflow_or_404(workflow_id))
+            if if_match.strip().strip('"') != current:
+                raise HTTPException(status_code=409, detail={
+                    "message": "This workflow was changed elsewhere (another Studio tab or the "
+                               "CLI) after you opened it. Your latest edit was not saved.",
+                    "revision": current})
         workspace.save_workflow(workflow)
-        return SavedWorkflow(workflow=workflow, validation=validate(workflow))
+        return SavedWorkflow(workflow=workflow, validation=validate(workflow),
+                             revision=workflow_revision(workflow))
 
     @app.delete("/api/workflows/{workflow_id}", status_code=204)
     def delete_workflow(workflow_id: str) -> Response:

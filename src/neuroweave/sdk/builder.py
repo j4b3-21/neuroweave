@@ -99,7 +99,7 @@ class WorkflowBuilder:
         return candidate
 
 
-def auto_layout(workflow: Workflow, *, dx: float = 300.0, dy: float = 150.0) -> None:
+def auto_layout(workflow: Workflow, *, dx: float = 320.0, dy: float = 300.0) -> None:
     """Place nodes in columns by dependency depth (no-op for cyclic graphs)."""
     try:
         levels = depths(workflow)

@@ -12,7 +12,8 @@ HEADERS = {"X-NeuroWeave-Client": "test"}
 
 @pytest.fixture
 def client(demo_project):
-    with TestClient(create_app(demo_project.root)) as test_client:
+    app = create_app(demo_project.root, allowed_hosts_extra=["testserver"])
+    with TestClient(app) as test_client:
         yield test_client
 
 
@@ -26,8 +27,11 @@ def wait_for(client, run_id, timeout=60.0):
     raise AssertionError(f"run {run_id} did not finish")
 
 
-def test_security_checks(client) -> None:
+def test_security_checks(client, demo_project) -> None:
     assert client.get("/api/health", headers={"host": "evil.example"}).status_code == 403
+    assert client.get("/api/health", headers={"host": "127.0.0.1:8765"}).status_code == 200
+    with TestClient(create_app(demo_project.root)) as default_client:
+        assert default_client.get("/api/health").status_code == 403  # Host: testserver
     response = client.post("/api/workflows", json={"id": "x", "name": "x"})
     assert response.status_code == 403
     assert client.post("/api/workflows", json={"id": "x", "name": "x"},
@@ -57,6 +61,30 @@ def test_catalog_and_workflow_editing(client) -> None:
     bad = client.put("/api/workflows/rainfall-yield", json={"id": "other", "name": "x"},
                      headers=HEADERS)
     assert bad.status_code == 400
+
+
+def test_concurrent_edits_are_refused_not_overwritten(client) -> None:
+    opened = client.get("/api/workflows/rainfall-yield")
+    revision = opened.headers["etag"]
+    mine, theirs = opened.json(), opened.json()
+
+    theirs["description"] = "edited in another tab"
+    first = client.put("/api/workflows/rainfall-yield", json=theirs,
+                       headers={**HEADERS, "If-Match": revision})
+    assert first.status_code == 200
+    assert first.json()["revision"] == client.get(
+        "/api/workflows/rainfall-yield").headers["etag"].strip('"')
+
+    mine["description"] = "stale edit"
+    stale = client.put("/api/workflows/rainfall-yield", json=mine,
+                       headers={**HEADERS, "If-Match": revision})
+    assert stale.status_code == 409
+    assert client.get("/api/workflows/rainfall-yield").json()["description"] == \
+        "edited in another tab"
+
+    retry = client.put("/api/workflows/rainfall-yield", json=mine,
+                       headers={**HEADERS, "If-Match": first.json()["revision"]})
+    assert retry.status_code == 200
 
 
 def test_run_lifecycle_through_worker_process(client) -> None:
