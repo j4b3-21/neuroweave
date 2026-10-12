@@ -77,6 +77,39 @@ def _outputs(workspace: Workspace, execution: NodeExecutionRecord) -> dict[str, 
     return {a.port or "": a for a in workspace.db.outputs_of(execution.id)}
 
 
+def _lock_hash(environment: dict | None) -> str | None:
+    if not environment:
+        return None
+    lock = environment.get("lock")
+    if not isinstance(lock, dict):
+        return None
+    digest = lock.get("hash")
+    return digest if isinstance(digest, str) and digest else None
+
+
+def _environment_match(original: dict | None, reproduction: dict | None) -> (
+        Literal["identical", "different", "unknown"]):
+    """Compare the pinned locks of two runs. Missing locks are ``unknown``, never invented."""
+    a, b = _lock_hash(original), _lock_hash(reproduction)
+    if a is None or b is None:
+        return "unknown"
+    return "identical" if a == b else "different"
+
+
+def _project_lockfile_map(environment: dict | None) -> dict[str, str]:
+    if not environment:
+        return {}
+    entries = environment.get("project_lockfiles") or []
+    if not isinstance(entries, list):
+        return {}
+    result: dict[str, str] = {}
+    for entry in entries:
+        if isinstance(entry, dict) and isinstance(entry.get("path"), str) and isinstance(
+                entry.get("hash"), str):
+            result[entry["path"]] = entry["hash"]
+    return result
+
+
 def _environment_diff(a: dict | None, b: dict | None) -> dict[str, Any]:
     """Differences between two captured environments; empty if either was never captured."""
     if not a or not b:
@@ -91,6 +124,12 @@ def _environment_diff(a: dict | None, b: dict | None) -> dict[str, Any]:
     removed = {k: pa[k] for k in sorted(pa.keys() - pb.keys())}
     if changed or added or removed:
         diff["packages"] = {"changed": changed, "added": added, "removed": removed}
+    la, lb = _lock_hash(a), _lock_hash(b)
+    if la != lb and (la is not None or lb is not None):
+        diff["lock"] = {"a": la, "b": lb}
+    pla, plb = _project_lockfile_map(a), _project_lockfile_map(b)
+    if pla != plb:
+        diff["project_lockfiles"] = {"a": pla, "b": plb}
     return diff
 
 
@@ -207,6 +246,8 @@ class ReproductionReport(BaseModel):
     outputs: list[OutputCheck]
     code_changed_nodes: list[str]
     environment_differences: dict[str, Any]
+    environment_match: Literal["identical", "different", "unknown"] = "unknown"
+    isolated: bool = False
     notes: list[str]
 
 
@@ -225,6 +266,8 @@ def reproduction_report(workspace: Workspace, reproduction_run_id: str) -> Repro
     ]
     code_changed = [n.node_id for n in comparison.nodes
                     if n.code_changed or (None not in n.version and n.version[0] != n.version[1])]
+    match = _environment_match(original.environment, run.environment)
+    isolated = run.trigger == "reproduce-isolated"
     notes: list[str] = []
     if original.status != "SUCCEEDED":
         notes.append(f"The original run ended {original.status}; only its recorded outputs "
@@ -250,10 +293,29 @@ def reproduction_report(workspace: Workspace, reproduction_run_id: str) -> Repro
         verdict = "reproduced"
     else:
         verdict = "not_reproduced"
+
+    if run.status not in ("PENDING", "RUNNING"):
+        if verdict == "reproduced" and match == "identical" and isolated:
+            notes.append("Outputs are byte-identical and the reproduction ran in a rebuilt "
+                         "environment whose lock matches the original.")
+        elif verdict == "reproduced" and match == "identical":
+            notes.append("Outputs are byte-identical and the environment lock matches the "
+                         "original.")
+        elif verdict == "reproduced" and match == "different":
+            la = _lock_hash(original.environment)
+            lb = _lock_hash(run.environment)
+            notes.append(
+                "Outputs are byte-identical but the environment differs "
+                f"(lock hash {(la or '?')[:12]} vs {(lb or '?')[:12]}).")
+        elif verdict == "reproduced" and match == "unknown":
+            notes.append("Outputs are byte-identical; at least one run has no environment lock, "
+                         "so environment equality is unknown.")
+
     return ReproductionReport(
         original_run_id=original.id, reproduction_run_id=run.id, verdict=verdict,
         outputs=checks, code_changed_nodes=code_changed,
-        environment_differences=comparison.environment, notes=notes,
+        environment_differences=comparison.environment, environment_match=match,
+        isolated=isolated, notes=notes,
     )
 
 
