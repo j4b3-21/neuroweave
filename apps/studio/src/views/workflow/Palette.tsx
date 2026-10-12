@@ -32,7 +32,8 @@ export function Palette({ catalog, onAdd }: {
   }, [catalog, filter]);
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-rule bg-panel" aria-label="Node palette">
+    <aside className="flex w-56 shrink-0 flex-col border-r border-rule bg-panel"
+           aria-label="Node palette" data-tour="palette">
       <div className="border-b border-rule p-2">
         <div className="relative">
           <Search size={14} className="absolute top-1/2 left-2 -translate-y-1/2 text-ink-faint" />

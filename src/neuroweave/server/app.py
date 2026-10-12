@@ -52,6 +52,7 @@ class ProjectInfo(BaseModel):
     version: str
     workflow_count: int
     run_count: int
+    tutorial: bool = False
 
 
 class ProjectUpdate(BaseModel):
@@ -203,6 +204,7 @@ def create_app(project_root: Path, *, allowed_hosts_extra: list[str] | tuple[str
             default_seed=config.default_seed, version=__version__,
             workflow_count=len(workspace.list_workflows()),
             run_count=len(workspace.db.list_runs(limit=1_000_000)),
+            tutorial=bool(config.tutorial),
         )
 
     @app.get("/api/project", response_model=ProjectInfo)

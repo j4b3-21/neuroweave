@@ -63,7 +63,8 @@ function NodeCardImpl({ data, selected }: NodeProps<NodeCardNode>) {
   const { instance, definition, connectedInputs, execution, errorCount, stale } = data;
   const rail = execution ? statusColor(execution.status, execution.cache_hit) : "var(--color-rule)";
   return (
-    <div className={`min-w-[210px] max-w-[280px] rounded-md border bg-panel ${
+    <div data-tour={`node-${instance.id}`}
+         className={`min-w-[210px] max-w-[280px] rounded-md border bg-panel ${
       selected ? "border-signal ring-2 ring-signal/25" : errorCount ? "border-fail/60" : "border-rule"}`}
          style={{ boxShadow: `inset 4px 0 0 ${rail}`, opacity: stale ? 0.92 : 1 }}>
       <div className="border-b border-rule-soft py-1.5 pr-3 pl-3.5">

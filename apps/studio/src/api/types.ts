@@ -216,6 +216,7 @@ export interface ProjectInfo {
   version: string;
   workflow_count: number;
   run_count: number;
+  tutorial: boolean;
 }
 
 export interface WorkflowSummary {

@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Boxes, FlaskConical, FolderCog, Package, Plus, Workflow as WorkflowIcon } from "lucide-react";
+import {
+  Boxes, CircleHelp, FlaskConical, FolderCog, Package, Plus, Workflow as WorkflowIcon,
+} from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { api } from "../api/client";
@@ -55,7 +57,7 @@ function NewWorkflowForm({ onDone }: { onDone: () => void }) {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { view, workflowId, setView, openWorkflow } = useUi();
+  const { view, workflowId, setView, openWorkflow, startTour } = useUi();
   const [creating, setCreating] = useState(false);
   const project = useQuery({ queryKey: ["project"], queryFn: api.project });
   const workflows = useQuery({ queryKey: ["workflows"], queryFn: api.workflows,
@@ -72,7 +74,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2" aria-label="Main">
-          <div className="flex items-center justify-between px-2 pt-1 pb-1">
+          <div className="flex items-center justify-between px-2 pt-1 pb-1" data-tour="workflows">
             <span className="meta font-medium">Workflows</span>
             <button type="button" className="text-ink-faint hover:text-signal" title="New workflow"
                     aria-label="New workflow" onClick={() => setCreating(true)}>
@@ -94,17 +96,29 @@ export function Shell({ children }: { children: ReactNode }) {
             </NavButton>
           ))}
           <div className="my-2 border-t border-rule-soft" />
-          <NavButton active={view === "runs"} onClick={go("runs")} icon={<FlaskConical size={15} />}>
-            Runs & experiments
-          </NavButton>
-          <NavButton active={view === "artifacts"} onClick={go("artifacts")} icon={<Package size={15} />}>
-            Artifacts
-          </NavButton>
+          <div data-tour="nav-runs">
+            <NavButton active={view === "runs"} onClick={go("runs")} icon={<FlaskConical size={15} />}>
+              Runs & experiments
+            </NavButton>
+          </div>
+          <div data-tour="nav-artifacts">
+            <NavButton active={view === "artifacts"} onClick={go("artifacts")}
+                       icon={<Package size={15} />}>
+              Artifacts
+            </NavButton>
+          </div>
           <NavButton active={view === "nodes"} onClick={go("nodes")} icon={<Boxes size={15} />}>
             Node catalog
           </NavButton>
-          <NavButton active={view === "project"} onClick={go("project")} icon={<FolderCog size={15} />}>
-            Project settings
+          <div data-tour="nav-project">
+            <NavButton active={view === "project"} onClick={go("project")}
+                       icon={<FolderCog size={15} />}>
+              Project settings
+            </NavButton>
+          </div>
+          <div className="my-2 border-t border-rule-soft" />
+          <NavButton active={false} onClick={() => startTour(0)} icon={<CircleHelp size={15} />}>
+            Take the tour
           </NavButton>
         </nav>
         <div className="border-t border-rule px-4 py-2 meta flex items-center gap-1.5">

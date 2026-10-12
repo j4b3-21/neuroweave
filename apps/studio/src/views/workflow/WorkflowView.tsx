@@ -231,32 +231,34 @@ function Editor({ workflowId }: { workflowId: string }) {
           {SAVE_LABEL[saveState]}
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <button type="button" className="btn" onClick={() => validateNow.mutate()}
-                  disabled={validateNow.isPending}>
+          <button type="button" className="btn" data-tour="validate"
+                  onClick={() => validateNow.mutate()} disabled={validateNow.isPending}>
             <CheckCircle2 size={14} /> Validate
           </button>
-          <label className="flex items-center gap-1.5 text-[12px] text-ink-soft">
-            Seed
-            <input className="field w-28" inputMode="numeric" value={seed}
-                   placeholder={`default ${project.data?.default_seed ?? ""}`}
-                   onChange={(e) => setSeed(e.target.value)} aria-label="Run seed" />
-          </label>
-          <label className="flex items-center gap-1.5 text-[12px] text-ink-soft"
-                 title="Reuse results of identical node executions (same code, params, inputs and seed)">
-            <input type="checkbox" checked={useCache} onChange={(e) => setUseCache(e.target.checked)} />
-            Reuse cached results
-          </label>
-          {running ? (
-            <button type="button" className="btn btn-danger" onClick={() => cancelRun.mutate()}
-                    disabled={cancelRun.isPending || latestRun?.cancel_requested}>
-              <Square size={13} /> {latestRun?.cancel_requested ? "Cancelling…" : "Cancel run"}
-            </button>
-          ) : (
-            <button type="button" className="btn btn-primary" title={runBlocked ?? "Run this workflow"}
-                    onClick={() => startRun.mutate()} disabled={Boolean(runBlocked) || startRun.isPending}>
-              <Play size={13} /> Run
-            </button>
-          )}
+          <div className="flex items-center gap-2" data-tour="run">
+            <label className="flex items-center gap-1.5 text-[12px] text-ink-soft">
+              Seed
+              <input className="field w-28" inputMode="numeric" value={seed}
+                     placeholder={`default ${project.data?.default_seed ?? ""}`}
+                     onChange={(e) => setSeed(e.target.value)} aria-label="Run seed" />
+            </label>
+            <label className="flex items-center gap-1.5 text-[12px] text-ink-soft"
+                   title="Reuse results of identical node executions (same code, params, inputs and seed)">
+              <input type="checkbox" checked={useCache} onChange={(e) => setUseCache(e.target.checked)} />
+              Reuse cached results
+            </label>
+            {running ? (
+              <button type="button" className="btn btn-danger" onClick={() => cancelRun.mutate()}
+                      disabled={cancelRun.isPending || latestRun?.cancel_requested}>
+                <Square size={13} /> {latestRun?.cancel_requested ? "Cancelling…" : "Cancel run"}
+              </button>
+            ) : (
+              <button type="button" className="btn btn-primary" title={runBlocked ?? "Run this workflow"}
+                      onClick={() => startRun.mutate()} disabled={Boolean(runBlocked) || startRun.isPending}>
+                <Play size={13} /> Run
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -292,7 +294,7 @@ function Editor({ workflowId }: { workflowId: string }) {
               </button>
             </div>
           )}
-          <div ref={canvasRef} className="relative min-h-0 flex-1"
+          <div ref={canvasRef} className="relative min-h-0 flex-1" data-tour="canvas"
                onDragOver={(e) => {
                  if (e.dataTransfer.types.includes(DRAG_MIME)) {
                    e.preventDefault();

@@ -20,6 +20,8 @@ interface UiState {
   bottomOpen: boolean;
   bottomTab: BottomTab;
   toasts: Toast[];
+  tourActive: boolean;
+  tourStep: number;
   openWorkflow: (id: string | null) => void;
   openRun: (id: string | null) => void;
   openArtifact: (id: string | null) => void;
@@ -30,12 +32,20 @@ interface UiState {
   setBottomOpen: (open: boolean) => void;
   toast: (message: string, tone?: Toast["tone"]) => void;
   dismiss: (id: number) => void;
+  startTour: (step?: number) => void;
+  stopTour: () => void;
+  nextTour: (total: number) => void;
+  prevTour: () => void;
 }
 
 let toastCounter = 0;
 
 function fromHash(): Partial<UiState> {
-  const [view, id] = window.location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
+  const raw = window.location.hash.replace(/^#\/?/, "");
+  if (raw === "tour" || raw.startsWith("tour=")) {
+    return { view: "workflow", tourActive: true, tourStep: 0 };
+  }
+  const [view, id] = raw.split("/").map(decodeURIComponent);
   switch (view) {
     case "workflow":
       return { view: "workflow", workflowId: id || null };
@@ -61,6 +71,8 @@ export const useUi = create<UiState>((set) => ({
   bottomOpen: false,
   bottomTab: "problems",
   toasts: [],
+  tourActive: false,
+  tourStep: 0,
   ...fromHash(),
   openWorkflow: (id) => set({ view: "workflow", workflowId: id, selection: null }),
   openRun: (id) => set({ view: "runs", runId: id }),
@@ -82,6 +94,10 @@ export const useUi = create<UiState>((set) => ({
       tone === "error" ? 8000 : 4000);
   },
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  startTour: (step = 0) => set({ tourActive: true, tourStep: step }),
+  stopTour: () => set({ tourActive: false }),
+  nextTour: (total) => set((s) => ({ tourStep: Math.min(total - 1, s.tourStep + 1) })),
+  prevTour: () => set((s) => ({ tourStep: Math.max(0, s.tourStep - 1) })),
 }));
 
 window.addEventListener("hashchange", () => useUi.setState({ selection: null, ...fromHash() }));

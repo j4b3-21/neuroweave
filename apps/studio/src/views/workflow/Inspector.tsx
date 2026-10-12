@@ -279,7 +279,8 @@ function EdgePanel({ edgeId, draft, definitions, validation, update }: Props & {
 export function Inspector(props: Props) {
   const selection = useUi((s) => s.selection);
   return (
-    <aside className="w-80 shrink-0 overflow-y-auto border-l border-rule bg-panel" aria-label="Inspector">
+    <aside className="w-80 shrink-0 overflow-y-auto border-l border-rule bg-panel"
+           aria-label="Inspector" data-tour="inspector">
       {selection?.kind === "node" ? <NodePanel nodeId={selection.id} {...props} />
         : selection?.kind === "edge" ? <EdgePanel edgeId={selection.key} {...props} />
         : <WorkflowPanel {...props} />}
