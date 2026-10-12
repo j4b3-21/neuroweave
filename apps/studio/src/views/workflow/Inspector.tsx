@@ -7,7 +7,7 @@ import type {
   Issue, NodeDefinition, NodeExecutionDetail, RunRecord, ValidationReport, Workflow,
 } from "../../api/types";
 import { Hash, KeyValue, Section, StatusBadge } from "../../components/common";
-import { formatDuration, formatValue } from "../../lib/format";
+import { formatDuration, formatNodeError, formatValue } from "../../lib/format";
 import { edgeKey, parseEdgeKey, removeEdges, removeNodes, setParam, typeLabel, updateNode }
   from "../../lib/graph";
 import { useUi } from "../../state/ui";
@@ -224,7 +224,7 @@ function NodePanel({ nodeId, ...props }: Props & { nodeId: string }) {
             ]} />
             {execution.error && (
               <p className="rounded-md bg-fail/5 px-2 py-1.5 text-[12px] text-fail">
-                {execution.error_type}: {execution.error}
+                {formatNodeError(execution.error, execution.error_type)}
               </p>
             )}
             {detail.outputs.length > 0 && (

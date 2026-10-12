@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { api, isActive } from "../../api/client";
 import type { RunDetail, ValidationReport } from "../../api/types";
 import { StatusBadge } from "../../components/common";
-import { formatDuration } from "../../lib/format";
+import { formatDuration, formatNodeError } from "../../lib/format";
 import { useUi, type BottomTab } from "../../state/ui";
 
 function Problems({ validation }: { validation: ValidationReport | null }) {
@@ -57,7 +57,7 @@ function RunProgress({ detail }: { detail: RunDetail | undefined }) {
               <td className="w-28"><StatusBadge status={execution.status} cacheHit={execution.cache_hit} /></td>
               <td className="w-20">{formatDuration(execution.duration_ms)}</td>
               <td className={execution.error ? "text-fail" : "text-ink-faint"}>
-                {execution.error ? `${execution.error_type}: ${execution.error}` : execution.cache_note}
+                {execution.error ? formatNodeError(execution.error, execution.error_type) : execution.cache_note}
               </td>
             </tr>
           ))}

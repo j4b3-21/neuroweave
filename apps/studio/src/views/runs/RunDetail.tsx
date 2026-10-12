@@ -5,7 +5,9 @@ import { useState, type ReactNode } from "react";
 import { api, isActive } from "../../api/client";
 import type { Environment, ReproductionReport, RunDetail as RunDetailData } from "../../api/types";
 import { EmptyState, ErrorText, Hash, KeyValue, Section, StatusBadge } from "../../components/common";
-import { formatDuration, formatNumber, formatTime, formatValue, runDuration } from "../../lib/format";
+import {
+  formatDuration, formatNodeError, formatNumber, formatTime, formatValue, runDuration,
+} from "../../lib/format";
 import { useUi } from "../../state/ui";
 
 const VERDICT_TEXT: Record<ReproductionReport["verdict"], { tone: string; text: string }> = {
@@ -131,7 +133,7 @@ function NodesTable({ detail }: { detail: RunDetailData }) {
               )}
               {execution.error && (
                 <details className="mt-1 text-[12px] text-fail">
-                  <summary className="cursor-pointer">{execution.error_type}: {execution.error}</summary>
+                  <summary className="cursor-pointer">{formatNodeError(execution.error, execution.error_type)}</summary>
                   <pre className="mt-1 overflow-x-auto font-mono text-[11px] whitespace-pre-wrap">{execution.traceback}</pre>
                 </details>
               )}
