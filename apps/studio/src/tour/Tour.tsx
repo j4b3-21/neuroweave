@@ -161,7 +161,9 @@ export function WelcomeDialog() {
 
   useEffect(() => {
     const hash = window.location.hash;
-    if (hash === "#tour" || hash.startsWith("#tour=") || hash === "#/tour") {
+    const tourHash = hash === "#tour" || hash === "#/tour"
+      || hash.startsWith("#tour=") || hash.startsWith("#/tour=");
+    if (tourHash) {
       startTour(0);
       window.history.replaceState(null, "", "#/workflow");
       return;
