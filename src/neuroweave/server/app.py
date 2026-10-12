@@ -86,6 +86,12 @@ class RunRequest(BaseModel):
     use_cache: bool = True
 
 
+class ReproduceRequest(BaseModel):
+    isolated: bool = False
+    rebuild: bool = False
+    allow_build: bool = False
+
+
 class NodeExecutionDetail(BaseModel):
     execution: NodeExecutionRecord
     inputs: dict[str, ArtifactRecord]
@@ -336,10 +342,21 @@ def create_app(project_root: Path, *, allowed_hosts_extra: list[str] | tuple[str
         return record
 
     @app.post("/api/runs/{run_id}/reproduce", response_model=RunRecord, status_code=202)
-    def reproduce(run_id: str) -> RunRecord:
+    def reproduce(run_id: str, request: ReproduceRequest | None = None) -> RunRecord:
         original = get_run_or_404(run_id)
         if original.status not in ("SUCCEEDED", "FAILED"):
             raise HTTPException(status_code=409, detail="Only finished runs can be reproduced.")
+        body = request or ReproduceRequest()
+        if body.isolated:
+            try:
+                return runs.start_isolated(
+                    original.id, rebuild=body.rebuild, allow_build=body.allow_build)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from None
+        if body.rebuild or body.allow_build:
+            raise HTTPException(
+                status_code=400,
+                detail="rebuild and allow_build require isolated=true.")
         workflow = workspace.load_snapshot(original.snapshot_hash)
         return runs.start(workflow, seed=original.seed, use_cache=False, trigger="reproduce",
                           reproduces_run_id=original.id)

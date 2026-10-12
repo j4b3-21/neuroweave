@@ -25,6 +25,7 @@ from urllib.parse import unquote, urlparse
 
 from neuroweave.runtime.environment import lock_text_from_environment
 from neuroweave.runtime.executor import prepare_run
+from neuroweave.store.files import utc_now
 from neuroweave.store.trust import require_trusted
 from neuroweave.store.workspace import Workspace
 
@@ -292,6 +293,62 @@ def worker_command(env_dir: Path, workspace: Workspace, run_id: str) -> list[str
     ]
 
 
+def execute_isolated_pending(
+    workspace: Workspace,
+    original_run_id: str,
+    pending_run_id: str,
+    *,
+    allow_build: bool = False,
+    rebuild: bool = False,
+    runner: CommandRunner | None = None,
+    uv: str | None = None,
+    log: Callable[[str], None] | None = None,
+    worker_runner: CommandRunner | None = None,
+):
+    """Build the environment for ``original_run_id`` and run the already-prepared pending run."""
+    from neuroweave.experiments import reproduction_report
+
+    emit = log or (lambda _message: None)
+    original = workspace.db.get_run(original_run_id)
+    pending = workspace.db.get_run(pending_run_id)
+    if original is None:
+        raise KeyError(f"Run '{original_run_id}' does not exist.")
+    if pending is None:
+        raise KeyError(f"Run '{pending_run_id}' does not exist.")
+    if pending.reproduces_run_id != original.id:
+        raise IsolatedReproductionError(
+            f"Run '{pending_run_id}' is not a reproduction of '{original_run_id}'.")
+    if original.environment is None:
+        raise IsolatedReproductionError(
+            f"Run '{original_run_id}' has no recorded environment, so it cannot be rebuilt.")
+
+    try:
+        env_dir = build_environment(
+            workspace, original.environment, allow_build=allow_build, rebuild=rebuild,
+            runner=runner, uv=uv, log=emit,
+        )
+        python_in(env_dir)
+        command = worker_command(env_dir, workspace, pending.id)
+        emit("$ " + " ".join(command))
+        run = worker_runner or runner or _default_runner
+        result = run(command, workspace.root)
+        if result.stdout:
+            emit(result.stdout.rstrip())
+        if result.stderr:
+            emit(result.stderr.rstrip())
+    except IsolatedReproductionError as exc:
+        workspace.db.update_run(
+            pending.id, status="FAILED", finished_at=utc_now(),
+            error=f"Isolated environment rebuild failed: {exc}")
+        raise
+
+    report = reproduction_report(workspace, pending.id)
+    if result.returncode != 0 and report.verdict == "pending":
+        raise IsolatedReproductionError(
+            f"Isolated worker exited with code {result.returncode} without finishing the run.")
+    return report, env_dir
+
+
 def reproduce_isolated(
     workspace: Workspace,
     run_id: str,
@@ -303,43 +360,22 @@ def reproduce_isolated(
     log: Callable[[str], None] | None = None,
     worker_runner: CommandRunner | None = None,
 ):
-    """Rebuild the environment for ``run_id`` and execute a reproduction inside it.
-
-    Returns ``(pending_run, environment_dir)``. The pending run has already been executed
-    by the worker when this returns; load a ``ReproductionReport`` with
-    ``reproduction_report(workspace, pending.id)``.
-    """
-    from neuroweave.experiments import reproduction_report
-
-    emit = log or (lambda _message: None)
-    original, pending = prepare_isolated_reproduction(workspace, run_id)
-    assert original.environment is not None
-    env_dir = build_environment(
-        workspace, original.environment, allow_build=allow_build, rebuild=rebuild,
-        runner=runner, uv=uv, log=emit,
+    """Rebuild the environment for ``run_id`` and execute a reproduction inside it."""
+    _original, pending = prepare_isolated_reproduction(workspace, run_id)
+    return execute_isolated_pending(
+        workspace, run_id, pending.id, allow_build=allow_build, rebuild=rebuild,
+        runner=runner, uv=uv, log=log, worker_runner=worker_runner,
     )
-    python_in(env_dir)  # confirm the rebuilt interpreter exists before launching
-    command = worker_command(env_dir, workspace, pending.id)
-    emit("$ " + " ".join(command))
-    run = worker_runner or runner or _default_runner
-    result = run(command, workspace.root)
-    if result.stdout:
-        emit(result.stdout.rstrip())
-    if result.stderr:
-        emit(result.stderr.rstrip())
-    # Always build the report: a failed worker still leaves a FAILED run record.
-    report = reproduction_report(workspace, pending.id)
-    if result.returncode != 0 and report.verdict == "pending":
-        raise IsolatedReproductionError(
-            f"Isolated worker exited with code {result.returncode} without finishing the run.")
-    return report, env_dir
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", required=True)
     parser.add_argument("--run-id", required=True,
-                        help="Original run to reproduce in a rebuilt environment.")
+                        help="Original run whose environment lock to rebuild.")
+    parser.add_argument("--pending-run-id", default=None,
+                        help="Already-prepared PENDING reproduction run to execute. "
+                             "When omitted, a new reproduction run is created.")
     parser.add_argument("--rebuild", action="store_true",
                         help="Discard any cached rebuilt environment for this lock.")
     parser.add_argument("--allow-build", action="store_true",
@@ -352,10 +388,16 @@ def main(argv: list[str] | None = None) -> int:
         print(message, file=sys.stderr, flush=True)
 
     try:
-        report, env_dir = reproduce_isolated(
-            workspace, args.run_id, allow_build=args.allow_build, rebuild=args.rebuild,
-            log=log,
-        )
+        if args.pending_run_id:
+            report, env_dir = execute_isolated_pending(
+                workspace, args.run_id, args.pending_run_id,
+                allow_build=args.allow_build, rebuild=args.rebuild, log=log,
+            )
+        else:
+            report, env_dir = reproduce_isolated(
+                workspace, args.run_id, allow_build=args.allow_build, rebuild=args.rebuild,
+                log=log,
+            )
     except (IsolatedReproductionError, KeyError) as exc:
         print(f"[neuroweave] isolated reproduction failed: {exc}", file=sys.stderr)
         return 2
@@ -363,7 +405,6 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[neuroweave] reproduction {report.reproduction_run_id}: {report.verdict} "
           f"(environment_match={report.environment_match})", file=sys.stderr)
     return 0 if report.verdict == "reproduced" else 1
-
 
 if __name__ == "__main__":
     sys.exit(main())
