@@ -205,5 +205,6 @@ docs/
 - [docs/reproducibility.md](docs/reproducibility.md): caching, seeds, reproduction policy, blind spots
 - [docs/security.md](docs/security.md): threat model and protections
 - [docs/implementation-progress.md](docs/implementation-progress.md): status and next steps
+- [docs/release-readiness.md](docs/release-readiness.md): what has been verified for a release, with evidence
 - [docs/architecture-audit.md](docs/architecture-audit.md): audit of the starting point
 - `Architecture.md` and `ResearchOS.md`: the original proposal and long-term vision
