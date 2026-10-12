@@ -72,6 +72,11 @@ class ProjectConfig(BaseModel):
         description="External input files up to this size are copied into the artifact store; "
         "larger files are recorded by hash only.",
     )
+    tutorial: bool = Field(
+        default=False,
+        description="True when this project was created by `nw tutor`. The Studio uses it to "
+        "enable demo-specific tour steps.",
+    )
 
 
 @dataclass(frozen=True, slots=True)
